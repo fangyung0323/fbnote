@@ -15,6 +15,6 @@ services:
       - key: GITHUB_TOKEN
         sync: false
       - key: GITHUB_USERNAME
-        value: fangyung0323
+        value: isa930323-jpg
       - key: WEBSITE_REPO_NAME
         value: fb                       # 你的網站倉庫名稱
