@@ -3,7 +3,7 @@ def commit_and_push_to_website():
     
     # 從環境變數取得網站倉庫資訊
     username = os.getenv("GITHUB_USERNAME", "fangyung0323")
-    token = os.getenv("GITHUB_TOKEN")
+    token = os.getenv("GH_TOKEN")
     repo_name = os.getenv("WEBSITE_REPO_NAME", "fb")
     
     # 檢查必要環境變數
