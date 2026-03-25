@@ -1,0 +1,20 @@
+# render.yaml (放在 fbnote 倉庫根目錄)
+services:
+  # 定時發文機器人
+  - type: cron
+    name: jueji-daily-post
+    runtime: python
+    repo: https://github.com/fangyung0323/fbnote
+    branch: main
+    schedule: "0 9 * * *"              # 每天 UTC 9:00
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/main.py
+    envVars:
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: WEBSITE_REPO_URL
+        sync: false                    # 網站倉庫的完整 URL（含 Token）
+      - key: GITHUB_USERNAME
+        value: fangyung0323
+      - key: GITHUB_TOKEN
+        sync: false                    # 用於推送的 Personal Access Token
