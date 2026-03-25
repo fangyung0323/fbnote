@@ -1,51 +1,60 @@
-# scripts/main.py - 改寫為單次執行版
-#!/usr/bin/env python3
-import os
-import sys
-import subprocess
-from datetime import datetime
-from categories import CATEGORIES, get_today_category
-from article_generator import ArticleGenerator
-from image_generator import ImageGenerator
-
-def main():
-    print(f"🤖 蕨積機器人啟動 - {datetime.now()}")
-    
-    # 讀取 API 金鑰
-    deepseek_key = os.getenv("DEEPSEEK_API_KEY")
-    if not deepseek_key:
-        print("❌ 錯誤：請設定 DEEPSEEK_API_KEY 環境變數")
-        sys.exit(1)
-    
-    # 選擇今日類別
-    today_category = get_today_category()
-    category_info = CATEGORIES[today_category]
-    print(f"📝 今日類別：{category_info['name']}")
-    
-    # 1. 生成文章
-    article_gen = ArticleGenerator(deepseek_key)
-    article = article_gen.generate(today_category, category_info)
-    
-    # 2. 生成圖片
-    image_gen = ImageGenerator(deepseek_key)
-    image_path = image_gen.generate(category_info["image_prompt"], today_category)
-    
-    # 3. 產生 HTML 檔案（儲存到 articles/ 目錄）
-    html_path = generate_html(article, image_path)
-    print(f"✅ 文章已生成：{html_path}")
-    
-    # 4. 提交並推送至 Git（Render Cron Job 需有寫入權限）
-    commit_and_push()
-    
-    print("🎉 執行完畢！")
-
 def commit_and_push():
-    """提交變更並推送到 Git 倉庫"""
-    subprocess.run(["git", "config", "user.name", "render-cron"], check=False)
-    subprocess.run(["git", "config", "user.email", "render@local"], check=False)
-    subprocess.run(["git", "add", "articles/", "images/"], check=False)
-    subprocess.run(["git", "commit", "-m", f"每日發文 {datetime.now().strftime('%Y-%m-%d')}"], check=False)
-    subprocess.run(["git", "push"], check=False)
-
-if __name__ == "__main__":
-    main()
+    """將文章和圖片推送到網站倉庫"""
+    
+    # 從環境變數取得網站倉庫 URL
+    website_repo = os.getenv("WEBSITE_REPO_URL")
+    if not website_repo:
+        # 如果沒有設定完整 URL，則組合
+        username = os.getenv("GITHUB_USERNAME", "fangyung0323")
+        token = os.getenv("GITHUB_TOKEN")
+        repo_name = os.getenv("WEBSITE_REPO_NAME", "jueji-website")  # 你的網站倉庫名稱
+        
+        if token:
+            website_repo = f"https://{username}:{token}@github.com/{username}/{repo_name}.git"
+        else:
+            website_repo = f"https://github.com/{username}/{repo_name}.git"
+    
+    # 方法：使用臨時目錄 clone 網站倉庫
+    import tempfile
+    import shutil
+    
+    with tempfile.TemporaryDirectory() as tmpdir:
+        print(f"📁 臨時目錄: {tmpdir}")
+        
+        # 1. Clone 網站倉庫
+        clone_cmd = ["git", "clone", website_repo, "website"]
+        subprocess.run(clone_cmd, cwd=tmpdir, check=True, capture_output=True)
+        
+        # 2. 複製新產生的文章和圖片
+        website_dir = os.path.join(tmpdir, "website")
+        
+        # 複製 articles 目錄
+        if os.path.exists("articles"):
+            dest_articles = os.path.join(website_dir, "articles")
+            if os.path.exists(dest_articles):
+                shutil.rmtree(dest_articles)
+            shutil.copytree("articles", dest_articles)
+        
+        # 複製 images 目錄
+        if os.path.exists("images"):
+            dest_images = os.path.join(website_dir, "images")
+            if os.path.exists(dest_images):
+                shutil.rmtree(dest_images)
+            shutil.copytree("images", dest_images)
+        
+        # 3. 提交並推送
+        subprocess.run(["git", "config", "user.name", "jueji-bot"], cwd=website_dir, check=False)
+        subprocess.run(["git", "config", "user.email", "bot@jueji.com"], cwd=website_dir, check=False)
+        subprocess.run(["git", "add", "."], cwd=website_dir, check=True)
+        
+        # 檢查是否有變更
+        status = subprocess.run(["git", "status", "--porcelain"], cwd=website_dir, capture_output=True, text=True)
+        if status.stdout.strip():
+            subprocess.run(["git", "commit", "-m", f"每日發文 {datetime.now().strftime('%Y-%m-%d')}"], cwd=website_dir, check=False)
+            push_result = subprocess.run(["git", "push"], cwd=website_dir, capture_output=True, text=True)
+            if push_result.returncode == 0:
+                print("✅ 已推送到網站倉庫")
+            else:
+                print(f"❌ 推送失敗: {push_result.stderr}")
+        else:
+            print("📭 沒有新的變更需要推送")
