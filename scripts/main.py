@@ -350,24 +350,27 @@ def get_template_styles():
     }"""
 
 def get_footer_html():
-    """返回 footer HTML"""
+    """返回 footer HTML（使用絕對路徑）"""
     return """<footer>
     <ul class="footer-links">
-      <li><a href="../shop.html">植物選品</a></li>
-      <li><a href="../consult.html">綠色顧問</a></li>
-      <li><a href="../fbnote.html">蕨望筆記</a></li>
-      <li><a href="../about.html">關於蕨積</a></li>
+      <li><a href="/shop.html">植物選品</a></li>
+      <li><a href="/consult.html">綠色顧問</a></li>
+      <li><a href="/fbnote.html">蕨望筆記</a></li>
+      <li><a href="/about.html">關於蕨積</a></li>
     </ul>
     <p class="footer-copy">© 2026 蕨積 FernBrom . All rights reserved.</p>
   </footer>"""
 
 def get_nav_script():
-    """返回導覽列載入腳本（從上層目錄載入）"""
+    """返回導覽列載入腳本（使用絕對路徑修正連結）"""
     return """document.addEventListener('DOMContentLoaded', function () {
-      fetch('../nav.html')
+      fetch('/nav.html')
         .then(response => response.text())
         .then(data => {
-          document.getElementById('nav-placeholder').innerHTML = data;
+          // 修正導覽列中的連結，加上前綴 /
+          let fixedData = data.replace(/href="(?!https?:\/\/|\/)([^"]+)"/g, 'href="/$1"');
+          fixedData = fixedData.replace(/href="\/([^"]+)"/g, 'href="/$1"');
+          document.getElementById('nav-placeholder').innerHTML = fixedData;
           initNav();
         })
         .catch(err => {
