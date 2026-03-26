@@ -42,7 +42,7 @@ PROMPT_TEMPLATES = {
 
 要求：
 1. 標題要吸引人
-2. 內容約 500-800 字
+2. 內容約 400-600 字
 3. 語言使用繁體中文
 4. 結尾加上「🌿 蕨積 - 讓生活多一點綠」""",
 
@@ -54,7 +54,7 @@ PROMPT_TEMPLATES = {
 
 要求：
 1. 標題要吸引人
-2. 內容約 500-800 字
+2. 內容約 400-600 字
 3. 語言使用繁體中文
 4. 結尾加上「🌿 蕨積 - 讓生活多一點綠」""",
 
@@ -66,7 +66,7 @@ PROMPT_TEMPLATES = {
 
 要求：
 1. 標題要吸引人
-2. 內容約 500-800 字
+2. 內容約 400-600 字
 3. 語言使用繁體中文
 4. 結尾加上「🌿 蕨積 - 讓生活多一點綠」""",
 
@@ -78,7 +78,7 @@ PROMPT_TEMPLATES = {
 
 要求：
 1. 標題要吸引人
-2. 內容約 500-800 字
+2. 內容約 400-600 字
 3. 語言使用繁體中文
 4. 結尾加上「🌿 蕨積 - 讓生活多一點綠」"""
 }
@@ -485,7 +485,7 @@ def save_article_as_html(title, content, category, output_dir="articles"):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title} - 蕨積每日文章</title>
+    <title>{title}蕨積 - 每日文章</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -554,6 +554,8 @@ def save_article_as_html(title, content, category, output_dir="articles"):
                 每日一篇，與你一起成長
             </div>
             <a href="index.html" class="back-link">← 返回文章列表</a>
+            <a href="../forever.html" class="back-link">永續淨零</a>
+            <a href="../greenlab.html" class="back-link">綠色實驗室</a>
         </div>
     </main>
     
@@ -617,7 +619,7 @@ def generate_daily_post_index(daily_post_dir):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>蕨積每日文章 - 生活隨筆</title>
+    <title>蕨積 - 每日文章</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -745,8 +747,8 @@ def generate_daily_post_index(daily_post_dir):
     <main class="content">
         <div class="daily-container">
             <div class="page-header">
-                <h1>🌿 蕨積每日文章</h1>
-                <p>植物・永續・碳盤查・生活 — 每天一篇，與你一起成長</p>
+                <h1> 蕨積每日文章 </h1>
+                <p>每天一篇，與您一起成長</p>
             </div>
             
             <div class="categories">
