@@ -4,7 +4,7 @@
 - 使用 DeepSeek API 生成文章（四大類別輪換：植物、永續、碳盤查、生活）
 - 將文章保存為 HTML
 - 推送到網站倉庫的 daily-post 目錄
-- 自動生成含分類篩選、最新文章完整顯示、過往文章歸檔的索引頁面
+- 自動生成套用官網模板的索引頁面
 """
 
 import os
@@ -210,13 +210,336 @@ def save_article_as_html(title, content, category, output_dir="articles"):
     print(f"📄 文章已儲存：{filepath}")
     return filepath
 
-# ==================== 索引頁面生成 ====================
+# ==================== 模板輔助函數 ====================
+def get_template_styles():
+    """返回模板的 CSS 樣式（不含每日文章專用樣式）"""
+    return """/* ===== 共用樣式 ===== */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --ink: #1a1a14;
+      --moss: #3d5a38;
+      --fern: #5a7a4a;
+      --sage: #8aab7a;
+      --mist: #d4e4c8;
+      --cream: #f5f0e8;
+      --stone: #9a9080;
+      --paper: #faf7f2;
+    }
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      overflow-x: hidden;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 4vw; height: 72px;
+      background: rgba(250,247,242,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(90,122,74,0.12);
+    }
+    nav.scrolled { box-shadow: 0 2px 24px rgba(61,90,56,0.10); }
+
+    .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; flex-shrink: 0; }
+    .logo-mark { width: 38px; height: 38px; flex-shrink: 0; }
+    .logo-mark img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .logo-text {
+      font-family: 'Noto Serif TC', serif;
+      font-weight: 900;
+      font-size: 1.35rem;
+      color: var(--moss);
+      letter-spacing: 0.05em;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .logo-text span {
+      display: block;
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: 0.65rem;
+      letter-spacing: 0.25em;
+      color: var(--stone);
+      margin-top: 2px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+      list-style: none;
+      align-items: center;
+      white-space: nowrap;
+    }
+    .nav-links li { position: relative; padding: 0 2px; }
+    .nav-links a {
+      font-family: 'Noto Sans TC', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 400;
+      letter-spacing: 0.1em;
+      color: var(--ink);
+      text-decoration: none;
+      padding-bottom: 3px;
+      opacity: 0.75;
+      display: inline-block;
+    }
+    .nav-links a:hover { opacity: 1; color: var(--fern); }
+    .nav-contact {
+      padding: 8px 20px !important;
+      border: 1px solid var(--fern) !important;
+      border-radius: 2px;
+      color: var(--fern) !important;
+      opacity: 1 !important;
+      margin-left: 0.5rem;
+    }
+    .nav-contact:hover { background: var(--fern); color: white !important; }
+
+    .nav-links li .dropdown {
+      display: none;
+      position: absolute;
+      top: calc(100% + 18px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(250,247,242,0.98);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(90,122,74,0.14);
+      border-top: 2px solid var(--fern);
+      box-shadow: 0 12px 40px rgba(61,90,56,0.12);
+      min-width: 148px;
+      list-style: none;
+      padding: 8px 0;
+      z-index: 300;
+    }
+    .nav-links li:hover .dropdown { display: block; }
+    .nav-links li .dropdown::before {
+      content: '';
+      position: absolute;
+      top: -7px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-bottom: 6px solid var(--fern);
+    }
+    .dropdown li a {
+      display: block;
+      padding: 10px 20px;
+      font-size: 0.78rem;
+      font-weight: 400;
+      letter-spacing: 0.08em;
+      color: var(--ink);
+      opacity: 0.7;
+      white-space: nowrap;
+      text-decoration: none;
+    }
+    .dropdown li a:hover {
+      opacity: 1;
+      color: var(--fern);
+      padding-left: 26px;
+      background: rgba(90,122,74,0.04);
+    }
+    .dropdown li + li { border-top: 1px solid rgba(90,122,74,0.08); }
+
+    .hamburger {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      gap: 6px;
+      width: 40px; height: 40px;
+      cursor: pointer;
+      background: none; border: none;
+      flex-shrink: 0;
+    }
+    .hamburger span {
+      display: block;
+      width: 24px; height: 1.5px;
+      background: var(--moss);
+      transition: transform 0.2s ease;
+    }
+    .hamburger.open span:nth-child(1) { transform: translateY(7.5px) rotate(45deg); }
+    .hamburger.open span:nth-child(2) { opacity: 0; }
+    .hamburger.open span:nth-child(3) { transform: translateY(-7.5px) rotate(-45deg); }
+
+    .mobile-menu {
+      position: fixed; top: 72px; left: 0; right: 0; bottom: 0;
+      background: #faf7f2;
+      border-bottom: 1px solid rgba(90,122,74,0.15);
+      padding: 0 6vw 40px;
+      z-index: 99;
+      overflow-y: auto;
+      transform: translateX(100%);
+      visibility: hidden;
+      transition: transform 0.3s ease;
+    }
+    .mobile-menu.open { transform: translateX(0); visibility: visible; }
+    .mobile-menu ul { list-style: none; }
+    .mobile-menu > ul > li > a,
+    .mobile-parent {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 0;
+      font-family: 'Noto Serif TC', serif;
+      font-weight: 600;
+      font-size: 1rem;
+      letter-spacing: 0.08em;
+      color: var(--moss);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(90,122,74,0.1);
+      cursor: pointer;
+    }
+    .mobile-parent:hover { color: var(--fern); }
+    .mobile-caret { display: inline-block; transition: transform 0.2s; }
+    .mobile-caret.open { transform: rotate(180deg); }
+    .mobile-sub {
+      list-style: none;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+    .mobile-sub.open { max-height: 200px; }
+    .mobile-sub li a {
+      display: block;
+      padding: 11px 0 11px 16px;
+      font-size: 0.85rem;
+      color: var(--stone);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(90,122,74,0.06);
+      letter-spacing: 0.06em;
+    }
+    .mobile-sub li a:hover { color: var(--fern); }
+
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .hamburger { display: flex; }
+    }
+
+    .content {
+      flex: 1;
+      padding-top: 92px;
+      padding-bottom: 40px;
+    }
+
+    footer {
+      border-top: 1px solid rgba(90,122,74,0.15);
+      padding: 40px 4vw;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--paper);
+      margin-top: auto;
+    }
+    .footer-links {
+      display: flex;
+      gap: 24px;
+      list-style: none;
+    }
+    .footer-links a {
+      font-size: 0.75rem;
+      color: var(--stone);
+      text-decoration: none;
+      letter-spacing: 0.08em;
+      opacity: 0.7;
+    }
+    .footer-links a:hover {
+      opacity: 1;
+      color: var(--fern);
+    }
+    .footer-copy {
+      font-size: 0.75rem;
+      color: var(--stone);
+      letter-spacing: 0.1em;
+    }
+    @media (max-width: 768px) {
+      footer {
+        flex-direction: column;
+        gap: 20px;
+        text-align: center;
+      }
+      .footer-links {
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+    }"""
+
+def get_footer_html():
+    """返回 footer HTML"""
+    return """<footer>
+    <ul class="footer-links">
+      <li><a href="shop.html">植物選品</a></li>
+      <li><a href="consult.html">綠色顧問</a></li>
+      <li><a href="fbnote.html">蕨望筆記</a></li>
+      <li><a href="about.html">關於蕨積</a></li>
+    </ul>
+    <p class="footer-copy">© 2026 蕨積 FernBrom . All rights reserved.</p>
+  </footer>"""
+
+def get_nav_script():
+    """返回導覽列載入腳本"""
+    return """document.addEventListener('DOMContentLoaded', function () {
+      fetch('../nav.html')
+        .then(response => response.text())
+        .then(data => {
+          document.getElementById('nav-placeholder').innerHTML = data;
+          initNav();
+        })
+        .catch(err => {
+          console.error('無法載入導覽列:', err);
+          document.getElementById('nav-placeholder').innerHTML = 
+            '<nav style="background:var(--moss);color:white;padding:0 4vw;height:72px;display:flex;align-items:center;">' +
+            '<span style="font-family:Noto Serif TC,serif;font-weight:900;">🌿 蕨積</span>' +
+            '</nav>';
+        });
+
+      function initNav() {
+        var btn = document.getElementById('hamburger');
+        var menu = document.getElementById('mobileMenu');
+        if (btn && menu) {
+          btn.addEventListener('click', function () {
+            btn.classList.toggle('open');
+            menu.classList.toggle('open');
+          });
+          menu.querySelectorAll('.mobile-link').forEach(function (a) {
+            a.addEventListener('click', function () {
+              btn.classList.remove('open');
+              menu.classList.remove('open');
+            });
+          });
+        }
+        if (menu) {
+          menu.querySelectorAll('.mobile-parent').forEach(function (parent) {
+            parent.addEventListener('click', function () {
+              var id = parent.getAttribute('data-target');
+              var sub = document.getElementById(id);
+              var caretId = 'caret-' + id.replace('sub-', '');
+              var caret = document.getElementById(caretId);
+              var opening = !sub.classList.contains('open');
+              menu.querySelectorAll('.mobile-sub').forEach(function (s) { s.classList.remove('open'); });
+              menu.querySelectorAll('.mobile-caret').forEach(function (c) { c.classList.remove('open'); });
+              if (opening) {
+                sub.classList.add('open');
+                if (caret) caret.classList.add('open');
+              }
+            });
+          });
+        }
+        window.addEventListener('scroll', function () {
+          var nav = document.getElementById('mainNav');
+          if (nav) nav.classList.toggle('scrolled', window.scrollY > 20);
+        });
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      }
+    });"""
+
+# ==================== 索引頁面生成（套用官網模板） ====================
 def generate_daily_post_index(daily_post_dir):
     """產生 daily-post 目錄的索引頁面
-    上方四大類別分類按鈕，中間最新完整文章，右側過往文章歸檔
+    套用官網模板樣式，所有內容放在 <main> 內
     """
     articles = []
     for file in os.listdir(daily_post_dir):
+        # 只處理以日期開頭的 HTML 檔案 (格式: YYYY-MM-DD-*.html)
         if file.endswith(".html") and file != "index.html" and len(file) >= 10 and file[4] == '-' and file[7] == '-':
             filepath = os.path.join(daily_post_dir, file)
             
@@ -252,7 +575,29 @@ def generate_daily_post_index(daily_post_dir):
     
     if not articles:
         # 無文章時的提示
-        empty_html = """<!DOCTYPE html><html><head><meta charset="UTF-8"><title>蕨積每日文章</title><style>body{font-family:sans-serif;text-align:center;padding:2rem;background:#faf8f4;}</style></head><body><h1>🌿 蕨積每日文章</h1><p>📭 目前還沒有文章，等待機器人發文中...</p></body></html>"""
+        empty_html = f"""<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>蕨積每日文章 - 生活隨筆</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>{get_template_styles()}</style>
+</head>
+<body>
+    <div id="nav-placeholder"></div>
+    <main class="content">
+        <div style="text-align: center; padding: 60px 20px;">
+            <h1 style="font-family: 'Noto Serif TC', serif; color: var(--moss);">🌿 蕨積每日文章</h1>
+            <p style="color: var(--stone); margin-top: 1rem;">📭 目前還沒有文章，等待機器人發文中...</p>
+        </div>
+    </main>
+    {get_footer_html()}
+    <script>{get_nav_script()}</script>
+</body>
+</html>"""
         with open(os.path.join(daily_post_dir, "index.html"), "w", encoding="utf-8") as f:
             f.write(empty_html)
         print("📑 已更新 daily-post/index.html (無文章)")
@@ -276,216 +621,177 @@ def generate_daily_post_index(daily_post_dir):
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>蕨積每日文章 - 植物・永續・碳盤查・生活</title>
-    <style>
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #faf8f4;
-            color: #2c3e2f;
-            line-height: 1.6;
-        }}
-        .container {{ max-width: 1200px; margin: 0 auto; padding: 2rem; }}
-        
-        /* 標題區 */
-        .header {{ text-align: center; margin-bottom: 2rem; }}
-        .header h1 {{ color: #2c5e2e; font-size: 2rem; }}
-        .header p {{ color: #7f8c6d; margin-top: 0.5rem; }}
-        
-        /* 四大類別按鈕 */
-        .categories {{
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-            flex-wrap: wrap;
-            margin-bottom: 2rem;
-        }}
-        .category-btn {{
-            padding: 0.5rem 1.5rem;
-            border-radius: 30px;
-            border: none;
-            cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 500;
-            transition: transform 0.2s;
-            background: #e8e0d8;
-            color: #4a5b4e;
-        }}
-        .category-btn:hover {{ transform: translateY(-2px); }}
-        .category-btn.active {{
-            background: #4a7c59;
-            color: white;
-        }}
-        .category-植物.active {{ background: #4a7c59; }}
-        .category-永續.active {{ background: #2c7a4d; }}
-        .category-碳盤查.active {{ background: #1e6f5c; }}
-        .category-生活.active {{ background: #b88b4a; }}
-        
-        /* 兩欄布局 */
-        .layout {{ display: flex; gap: 2rem; flex-wrap: wrap; }}
-        .main-col {{ flex: 3; min-width: 250px; }}
-        .sidebar {{ flex: 1; min-width: 200px; background: white; border-radius: 16px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: fit-content; }}
-        
-        /* 最新文章完整顯示 */
-        .latest-article {{
-            background: white;
-            border-radius: 16px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-        }}
-        .latest-category {{
-            display: inline-block;
-            background: {CATEGORY_COLORS.get(latest['category'], '#6c757d')};
-            color: white;
-            padding: 0.2rem 0.8rem;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            margin-bottom: 1rem;
-        }}
-        .latest-title {{
-            font-size: 1.8rem;
-            color: #2c5e2e;
-            margin-bottom: 0.5rem;
-        }}
-        .latest-date {{ color: #7f8c6d; margin-bottom: 1.5rem; font-size: 0.9rem; }}
-        .latest-content {{ line-height: 1.8; }}
-        .read-more {{
-            display: inline-block;
-            margin-top: 1rem;
-            color: #4a7c59;
-            text-decoration: none;
-            font-weight: 500;
-        }}
-        
-        /* 過往文章列表 */
-        .section-title {{
-            font-size: 1.2rem;
-            color: #2c5e2e;
-            border-bottom: 2px solid #e0d6cc;
-            padding-bottom: 0.5rem;
-            margin-bottom: 1rem;
-        }}
-        .past-list {{ list-style: none; }}
-        .past-item {{
-            margin-bottom: 1rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid #f0e8e0;
-        }}
-        .past-link {{
-            font-size: 0.95rem;
-            font-weight: 500;
-            color: #4a7c59;
-            text-decoration: none;
-            display: block;
-        }}
-        .past-link:hover {{ text-decoration: underline; }}
-        .past-meta {{ font-size: 0.7rem; color: #aaa; margin-top: 0.25rem; }}
-        .past-badge {{
-            display: inline-block;
-            font-size: 0.65rem;
-            padding: 0.1rem 0.5rem;
-            border-radius: 12px;
-            color: white;
-            margin-right: 0.5rem;
-        }}
-        .archive-month {{ margin-bottom: 1rem; }}
-        .archive-month-title {{ font-weight: 600; color: #4a7c59; margin-bottom: 0.5rem; }}
-        .archive-list {{ list-style: none; padding-left: 0.5rem; }}
-        .archive-list li {{ margin-bottom: 0.3rem; }}
-        .archive-list a {{ color: #7f8c6d; text-decoration: none; font-size: 0.85rem; }}
-        .archive-list a:hover {{ color: #4a7c59; text-decoration: underline; }}
-        
-        @media (max-width: 768px) {{
-            .layout {{ flex-direction: column; }}
-            .latest-title {{ font-size: 1.4rem; }}
-        }}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>{get_template_styles()}
+    /* ===== 每日文章專用樣式 ===== */
+    .daily-container {{ max-width: 1200px; margin: 0 auto; padding: 0 2rem; }}
+    .page-header {{ text-align: center; margin-bottom: 2rem; }}
+    .page-header h1 {{ color: var(--moss); font-size: 2rem; font-family: 'Noto Serif TC', serif; }}
+    .page-header p {{ color: var(--stone); margin-top: 0.5rem; }}
+    
+    .categories {{
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 2rem;
+    }}
+    .category-btn {{
+        padding: 0.5rem 1.5rem;
+        border-radius: 30px;
+        border: none;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: transform 0.2s;
+        background: #e8e0d8;
+        color: #4a5b4e;
+    }}
+    .category-btn:hover {{ transform: translateY(-2px); }}
+    .category-btn.active {{ background: #4a7c59; color: white; }}
+    .category-植物.active {{ background: #4a7c59; }}
+    .category-永續.active {{ background: #2c7a4d; }}
+    .category-碳盤查.active {{ background: #1e6f5c; }}
+    .category-生活.active {{ background: #b88b4a; }}
+    
+    .two-columns {{ display: flex; gap: 2rem; flex-wrap: wrap; }}
+    .main-col {{ flex: 3; min-width: 250px; }}
+    .sidebar-col {{ flex: 1; min-width: 200px; background: white; border-radius: 16px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: fit-content; }}
+    
+    .latest-article {{
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }}
+    .latest-category {{
+        display: inline-block;
+        background: {CATEGORY_COLORS.get(latest['category'], '#6c757d')};
+        color: white;
+        padding: 0.2rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        margin-bottom: 1rem;
+    }}
+    .latest-title {{ font-size: 1.8rem; color: var(--moss); margin-bottom: 0.5rem; }}
+    .latest-date {{ color: var(--stone); margin-bottom: 1.5rem; font-size: 0.9rem; }}
+    .latest-content {{ line-height: 1.8; }}
+    .read-more {{ display: inline-block; margin-top: 1rem; color: var(--fern); text-decoration: none; font-weight: 500; }}
+    
+    .section-title {{ font-size: 1.2rem; color: var(--moss); border-bottom: 2px solid #e0d6cc; padding-bottom: 0.5rem; margin-bottom: 1rem; }}
+    .past-list {{ list-style: none; }}
+    .past-item {{ margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #f0e8e0; }}
+    .past-link {{ font-size: 0.95rem; font-weight: 500; color: var(--fern); text-decoration: none; display: block; }}
+    .past-link:hover {{ text-decoration: underline; }}
+    .past-meta {{ font-size: 0.7rem; color: #aaa; margin-top: 0.25rem; }}
+    .past-badge {{ display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.5rem; border-radius: 12px; color: white; margin-right: 0.5rem; }}
+    .archive-month {{ margin-bottom: 1rem; }}
+    .archive-month-title {{ font-weight: 600; color: var(--moss); margin-bottom: 0.5rem; }}
+    .archive-list {{ list-style: none; padding-left: 0.5rem; }}
+    .archive-list li {{ margin-bottom: 0.3rem; }}
+    .archive-list a {{ color: var(--stone); text-decoration: none; font-size: 0.85rem; }}
+    .archive-list a:hover {{ color: var(--fern); text-decoration: underline; }}
+    
+    @media (max-width: 768px) {{
+        .two-columns {{ flex-direction: column; }}
+        .latest-title {{ font-size: 1.4rem; }}
+        .daily-container {{ padding: 0 1rem; }}
+    }}
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🌿 蕨積每日文章</h1>
-            <p>植物・永續・碳盤查・生活 — 每天一篇，與你一起成長</p>
-        </div>
-        
-        <div class="categories">
-            <button class="category-btn active" data-category="all">📋 全部</button>
-            <button class="category-btn category-植物" data-category="植物">🌿 植物</button>
-            <button class="category-btn category-永續" data-category="永續">♻️ 永續</button>
-            <button class="category-btn category-碳盤查" data-category="碳盤查">📊 碳盤查</button>
-            <button class="category-btn category-生活" data-category="生活">🏡 生活</button>
-        </div>
-        
-        <div class="layout">
-            <div class="main-col">
-                <!-- 最新文章完整顯示 -->
-                <div class="latest-article" id="latestArticle">
-                    <div class="latest-category">📌 {latest['category']}</div>
-                    <h1 class="latest-title">{latest['title']}</h1>
-                    <div class="latest-date">📅 {latest['date']}</div>
-                    <div class="latest-content">{latest['content']}</div>
-                    <a href="{latest['filename']}" class="read-more">🔗 查看獨立頁面 →</a>
-                </div>
-                
-                <div class="section-title">📖 過往文章</div>
-                <ul class="past-list" id="pastList">"""
+    <div id="nav-placeholder"></div>
+    
+    <main class="content">
+        <div class="daily-container">
+            <div class="page-header">
+                <h1>🌿 蕨積每日文章</h1>
+                <p>植物・永續・碳盤查・生活 — 每天一篇，與你一起成長</p>
+            </div>
+            
+            <div class="categories">
+                <button class="category-btn active" data-category="all">📋 全部</button>
+                <button class="category-btn category-植物" data-category="植物">🌿 植物</button>
+                <button class="category-btn category-永續" data-category="永續">♻️ 永續</button>
+                <button class="category-btn category-碳盤查" data-category="碳盤查">📊 碳盤查</button>
+                <button class="category-btn category-生活" data-category="生活">🏡 生活</button>
+            </div>
+            
+            <div class="two-columns">
+                <div class="main-col">
+                    <div class="latest-article">
+                        <div class="latest-category">📌 {latest['category']}</div>
+                        <h1 class="latest-title">{latest['title']}</h1>
+                        <div class="latest-date">📅 {latest['date']}</div>
+                        <div class="latest-content">{latest['content']}</div>
+                        <a href="{latest['filename']}" class="read-more">🔗 查看獨立頁面 →</a>
+                    </div>
+                    
+                    <div class="section-title">📖 過往文章</div>
+                    <ul class="past-list" id="pastList">"""
     
     for article in past_articles[:30]:
         cat_color = CATEGORY_COLORS.get(article["category"], "#6c757d")
         index_html += f"""
-                    <li class="past-item" data-category="{article['category']}">
-                        <span class="past-badge" style="background: {cat_color};">{article['category']}</span>
-                        <a class="past-link" href="{article['filename']}">{article['title']}</a>
-                        <div class="past-meta">📅 {article['date']}</div>
-                    </li>"""
+                        <li class="past-item" data-category="{article['category']}">
+                            <span class="past-badge" style="background: {cat_color};">{article['category']}</span>
+                            <a class="past-link" href="{article['filename']}">{article['title']}</a>
+                            <div class="past-meta">📅 {article['date']}</div>
+                        </li>"""
     
     index_html += """
-                </ul>
-            </div>
-            
-            <div class="sidebar">
-                <div class="section-title">📚 歷史歸檔</div>"""
+                    </ul>
+                </div>
+                
+                <div class="sidebar-col">
+                    <div class="section-title">📚 歷史歸檔</div>"""
     
     sorted_months = sorted(archive_by_month.keys(), reverse=True)
     for month in sorted_months:
         month_display = f"{month[:4]}年{int(month[5:7])}月"
         index_html += f"""
-                <div class="archive-month">
-                    <div class="archive-month-title">{month_display}</div>
-                    <ul class="archive-list">"""
+                    <div class="archive-month">
+                        <div class="archive-month-title">{month_display}</div>
+                        <ul class="archive-list">"""
         for article in archive_by_month[month][:8]:
             index_html += f'<li><a href="{article["filename"]}">{article["title"][:25]}{"..." if len(article["title"]) > 25 else ""}</a></li>'
         if len(archive_by_month[month]) > 8:
             index_html += f'<li><a href="#" style="color:#aaa;">... 共{len(archive_by_month[month])}篇</a></li>'
         index_html += """
-                    </ul>
-                </div>"""
+                        </ul>
+                    </div>"""
     
-    index_html += """
+    index_html += f"""
+                </div>
             </div>
         </div>
-    </div>
+    </main>
     
-    <script>
-        // 分類篩選功能
-        const filterBtns = document.querySelectorAll('.category-btn');
-        const pastItems = document.querySelectorAll('#pastList .past-item');
-        
-        filterBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const category = btn.dataset.category;
-                filterBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                
-                pastItems.forEach(item => {
-                    if (category === 'all' || item.dataset.category === category) {
-                        item.style.display = '';
-                    } else {
-                        item.style.display = 'none';
-                    }
-                });
-            });
-        });
+    {get_footer_html()}
+    
+    <script>{get_nav_script()}
+    // 分類篩選功能
+    const filterBtns = document.querySelectorAll('.category-btn');
+    const pastItems = document.querySelectorAll('#pastList .past-item');
+    
+    filterBtns.forEach(btn => {{
+        btn.addEventListener('click', () => {{
+            const category = btn.dataset.category;
+            filterBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            pastItems.forEach(item => {{
+                if (category === 'all' || item.dataset.category === category) {{
+                    item.style.display = '';
+                }} else {{
+                    item.style.display = 'none';
+                }}
+            }});
+        }});
+    }});
     </script>
 </body>
 </html>"""
@@ -493,7 +799,7 @@ def generate_daily_post_index(daily_post_dir):
     index_path = os.path.join(daily_post_dir, "index.html")
     with open(index_path, "w", encoding="utf-8") as f:
         f.write(index_html)
-    print(f"📑 已更新 daily-post/index.html (共 {len(articles)} 篇文章，最新: {latest['title']})")
+    print(f"📑 已更新 daily-post/index.html (共 {len(articles)} 篇文章)")
 
 # ==================== 推送到網站倉庫 ====================
 def commit_and_push_to_website():
