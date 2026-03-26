@@ -4,7 +4,7 @@
 - 使用 DeepSeek API 生成文章（四大類別輪換：植物、永續、碳盤查、生活）
 - 將文章保存為 HTML
 - 推送到網站倉庫的 daily-post 目錄
-- 自動生成索引頁面
+- 自動生成含分類篩選、最新文章完整顯示、過往文章歸檔的索引頁面
 """
 
 import os
@@ -24,7 +24,7 @@ DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 # 四大類別
 CATEGORIES = ["植物", "永續", "碳盤查", "生活"]
 
-# 類別對應的顏色（用於頁面顯示）
+# 類別對應的顏色
 CATEGORY_COLORS = {
     "植物": "#4a7c59",
     "永續": "#2c7a4d",
@@ -83,7 +83,6 @@ PROMPT_TEMPLATES = {
 4. 結尾加上「🌿 蕨積 - 讓生活多一點綠」"""
 }
 
-# 各類別的 System Prompt
 SYSTEM_PROMPTS = {
     "植物": "你是一位植物學科普作家，擅長撰寫有趣且專業的植物文章。",
     "永續": "你是一位環境永續專家，擅長用淺顯易懂的方式講解永續議題。",
@@ -153,8 +152,6 @@ def save_article_as_html(title, content, category, output_dir="articles"):
     filepath = os.path.join(output_dir, filename)
     
     category_color = CATEGORY_COLORS.get(category, "#4a7c59")
-    
-    # 將換行轉換為 <br>
     content_html = content.replace(chr(10), "<br>")
     
     html_content = f"""<!DOCTYPE html>
@@ -166,7 +163,7 @@ def save_article_as_html(title, content, category, output_dir="articles"):
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             line-height: 1.8;
             max-width: 900px;
             margin: 0 auto;
@@ -200,14 +197,9 @@ def save_article_as_html(title, content, category, output_dir="articles"):
     <div class="category-tag">📌 {category}</div>
     <h1>{title}</h1>
     <div class="date">📅 {datetime.now().strftime("%Y年%m月%d日")}</div>
-    <div class="content">
-        {content_html}
-    </div>
+    <div class="content">{content_html}</div>
     <hr>
-    <div class="footer">
-        🌿 蕨積 - 讓生活多一點綠<br>
-        每日一篇，與你一起成長
-    </div>
+    <div class="footer">🌿 蕨積 - 讓生活多一點綠<br>每日一篇，與你一起成長</div>
     <a href="index.html" class="back-link">← 返回文章列表</a>
 </body>
 </html>"""
@@ -218,125 +210,290 @@ def save_article_as_html(title, content, category, output_dir="articles"):
     print(f"📄 文章已儲存：{filepath}")
     return filepath
 
-# ==================== 索引頁面生成（只顯示正式文章） ====================
+# ==================== 索引頁面生成 ====================
 def generate_daily_post_index(daily_post_dir):
-    """產生 daily-post 目錄的索引頁面（只顯示正式文章）"""
+    """產生 daily-post 目錄的索引頁面
+    上方四大類別分類按鈕，中間最新完整文章，右側過往文章歸檔
+    """
     articles = []
     for file in os.listdir(daily_post_dir):
-        # 只處理以日期開頭的 HTML 檔案 (格式: YYYY-MM-DD-*.html)
         if file.endswith(".html") and file != "index.html" and len(file) >= 10 and file[4] == '-' and file[7] == '-':
             filepath = os.path.join(daily_post_dir, file)
             
             category = "未分類"
             title = ""
+            content_html = ""
             date_str = file[:10]
             
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
                     full_content = f.read()
-                    
-                    # 提取類別
                     match_cat = re.search(r'<div class="category-tag">📌 (.+?)</div>', full_content)
                     if match_cat:
                         category = match_cat.group(1)
-                    
-                    # 提取標題
                     match_title = re.search(r'<h1>(.+?)</h1>', full_content)
                     if match_title:
                         title = match_title.group(1)
-                    else:
-                        # 從檔名提取標題
-                        title = file.replace(".html", "").replace(date_str + "-", "").replace("-", " / ")
-            except Exception as e:
-                print(f"⚠️ 讀取檔案失敗 {file}: {e}")
-                title = file.replace(".html", "").replace("-", " / ")
+                    match_content = re.search(r'<div class="content">(.*?)</div>', full_content, re.DOTALL)
+                    if match_content:
+                        content_html = match_content.group(1)
+            except:
+                title = file.replace(".html", "").replace(date_str + "-", "").replace("-", " / ")
             
             articles.append({
                 "filename": file,
                 "date": date_str,
                 "title": title,
-                "category": category
+                "category": category,
+                "content": content_html
             })
     
     articles.sort(key=lambda x: x["date"], reverse=True)
     
     if not articles:
-        print("⚠️ 沒有找到正式文章")
-        # 如果沒有正式文章，顯示提示訊息
-        index_content = """<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>蕨積每日文章</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; background: #faf8f4; color: #2c3e2f; text-align: center; }
-        h1 { color: #2c5e2e; }
-        .message { padding: 3rem; background: white; border-radius: 16px; margin-top: 2rem; }
-    </style>
-</head>
-<body>
-    <h1>🌿 蕨積每日文章</h1>
-    <div class="message">
-        <p>📭 目前還沒有文章</p>
-        <p>每日發文機器人正在準備中，敬請期待！</p>
-    </div>
-</body>
-</html>"""
-        index_path = os.path.join(daily_post_dir, "index.html")
-        with open(index_path, "w", encoding="utf-8") as f:
-            f.write(index_content)
+        # 無文章時的提示
+        empty_html = """<!DOCTYPE html><html><head><meta charset="UTF-8"><title>蕨積每日文章</title><style>body{font-family:sans-serif;text-align:center;padding:2rem;background:#faf8f4;}</style></head><body><h1>🌿 蕨積每日文章</h1><p>📭 目前還沒有文章，等待機器人發文中...</p></body></html>"""
+        with open(os.path.join(daily_post_dir, "index.html"), "w", encoding="utf-8") as f:
+            f.write(empty_html)
         print("📑 已更新 daily-post/index.html (無文章)")
         return
     
-    # 生成簡潔的 HTML
-    index_content = """<!DOCTYPE html>
+    latest = articles[0]
+    past_articles = articles[1:]
+    
+    # 按月歸檔
+    archive_by_month = {}
+    for article in past_articles:
+        month_key = article["date"][:7]
+        if month_key not in archive_by_month:
+            archive_by_month[month_key] = []
+        archive_by_month[month_key].append(article)
+    
+    # 生成完整 HTML
+    index_html = f"""<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>蕨積每日文章</title>
+    <title>蕨積每日文章 - 植物・永續・碳盤查・生活</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; background: #faf8f4; color: #2c3e2f; }
-        h1 { color: #2c5e2e; border-left: 4px solid #6b8c5c; padding-left: 1rem; }
-        .subtitle { color: #7f8c6d; margin-bottom: 1.5rem; }
-        .article-list { list-style: none; padding: 0; }
-        .article-item { margin: 1rem 0; padding: 1rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .article-link { font-size: 1.1rem; font-weight: 500; color: #4a7c59; text-decoration: none; display: block; }
-        .article-link:hover { text-decoration: underline; }
-        .article-date { color: #7f8c6d; font-size: 0.8rem; margin-top: 0.3rem; }
-        .category-badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.7rem; color: white; margin-right: 0.5rem; }
-        .footer { text-align: center; margin-top: 2rem; color: #7f8c6d; font-size: 0.8rem; }
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #faf8f4;
+            color: #2c3e2f;
+            line-height: 1.6;
+        }}
+        .container {{ max-width: 1200px; margin: 0 auto; padding: 2rem; }}
+        
+        /* 標題區 */
+        .header {{ text-align: center; margin-bottom: 2rem; }}
+        .header h1 {{ color: #2c5e2e; font-size: 2rem; }}
+        .header p {{ color: #7f8c6d; margin-top: 0.5rem; }}
+        
+        /* 四大類別按鈕 */
+        .categories {{
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+        }}
+        .category-btn {{
+            padding: 0.5rem 1.5rem;
+            border-radius: 30px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: transform 0.2s;
+            background: #e8e0d8;
+            color: #4a5b4e;
+        }}
+        .category-btn:hover {{ transform: translateY(-2px); }}
+        .category-btn.active {{
+            background: #4a7c59;
+            color: white;
+        }}
+        .category-植物.active {{ background: #4a7c59; }}
+        .category-永續.active {{ background: #2c7a4d; }}
+        .category-碳盤查.active {{ background: #1e6f5c; }}
+        .category-生活.active {{ background: #b88b4a; }}
+        
+        /* 兩欄布局 */
+        .layout {{ display: flex; gap: 2rem; flex-wrap: wrap; }}
+        .main-col {{ flex: 3; min-width: 250px; }}
+        .sidebar {{ flex: 1; min-width: 200px; background: white; border-radius: 16px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: fit-content; }}
+        
+        /* 最新文章完整顯示 */
+        .latest-article {{
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }}
+        .latest-category {{
+            display: inline-block;
+            background: {CATEGORY_COLORS.get(latest['category'], '#6c757d')};
+            color: white;
+            padding: 0.2rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin-bottom: 1rem;
+        }}
+        .latest-title {{
+            font-size: 1.8rem;
+            color: #2c5e2e;
+            margin-bottom: 0.5rem;
+        }}
+        .latest-date {{ color: #7f8c6d; margin-bottom: 1.5rem; font-size: 0.9rem; }}
+        .latest-content {{ line-height: 1.8; }}
+        .read-more {{
+            display: inline-block;
+            margin-top: 1rem;
+            color: #4a7c59;
+            text-decoration: none;
+            font-weight: 500;
+        }}
+        
+        /* 過往文章列表 */
+        .section-title {{
+            font-size: 1.2rem;
+            color: #2c5e2e;
+            border-bottom: 2px solid #e0d6cc;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }}
+        .past-list {{ list-style: none; }}
+        .past-item {{
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #f0e8e0;
+        }}
+        .past-link {{
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: #4a7c59;
+            text-decoration: none;
+            display: block;
+        }}
+        .past-link:hover {{ text-decoration: underline; }}
+        .past-meta {{ font-size: 0.7rem; color: #aaa; margin-top: 0.25rem; }}
+        .past-badge {{
+            display: inline-block;
+            font-size: 0.65rem;
+            padding: 0.1rem 0.5rem;
+            border-radius: 12px;
+            color: white;
+            margin-right: 0.5rem;
+        }}
+        .archive-month {{ margin-bottom: 1rem; }}
+        .archive-month-title {{ font-weight: 600; color: #4a7c59; margin-bottom: 0.5rem; }}
+        .archive-list {{ list-style: none; padding-left: 0.5rem; }}
+        .archive-list li {{ margin-bottom: 0.3rem; }}
+        .archive-list a {{ color: #7f8c6d; text-decoration: none; font-size: 0.85rem; }}
+        .archive-list a:hover {{ color: #4a7c59; text-decoration: underline; }}
+        
+        @media (max-width: 768px) {{
+            .layout {{ flex-direction: column; }}
+            .latest-title {{ font-size: 1.4rem; }}
+        }}
     </style>
 </head>
 <body>
-    <h1>🌿 蕨積每日文章</h1>
-    <div class="subtitle">植物・永續・碳盤查・生活 — 每天一篇，與你一起成長</div>
-    <ul class="article-list">
-"""
+    <div class="container">
+        <div class="header">
+            <h1>🌿 蕨積每日文章</h1>
+            <p>植物・永續・碳盤查・生活 — 每天一篇，與你一起成長</p>
+        </div>
+        
+        <div class="categories">
+            <button class="category-btn active" data-category="all">📋 全部</button>
+            <button class="category-btn category-植物" data-category="植物">🌿 植物</button>
+            <button class="category-btn category-永續" data-category="永續">♻️ 永續</button>
+            <button class="category-btn category-碳盤查" data-category="碳盤查">📊 碳盤查</button>
+            <button class="category-btn category-生活" data-category="生活">🏡 生活</button>
+        </div>
+        
+        <div class="layout">
+            <div class="main-col">
+                <!-- 最新文章完整顯示 -->
+                <div class="latest-article" id="latestArticle">
+                    <div class="latest-category">📌 {latest['category']}</div>
+                    <h1 class="latest-title">{latest['title']}</h1>
+                    <div class="latest-date">📅 {latest['date']}</div>
+                    <div class="latest-content">{latest['content']}</div>
+                    <a href="{latest['filename']}" class="read-more">🔗 查看獨立頁面 →</a>
+                </div>
+                
+                <div class="section-title">📖 過往文章</div>
+                <ul class="past-list" id="pastList">"""
     
-    for article in articles[:30]:
+    for article in past_articles[:30]:
         cat_color = CATEGORY_COLORS.get(article["category"], "#6c757d")
-        index_content += f"""
-        <li class="article-item">
-            <span class="category-badge" style="background: {cat_color};">{article['category']}</span>
-            <a class="article-link" href="{article['filename']}">{article['title']}</a>
-            <div class="article-date">📅 {article['date']}</div>
-        </li>"""
+        index_html += f"""
+                    <li class="past-item" data-category="{article['category']}">
+                        <span class="past-badge" style="background: {cat_color};">{article['category']}</span>
+                        <a class="past-link" href="{article['filename']}">{article['title']}</a>
+                        <div class="past-meta">📅 {article['date']}</div>
+                    </li>"""
     
-    index_content += """
-    </ul>
-    <div class="footer">
-        🌿 蕨積 - 讓生活多一點綠<br>
-        每日一篇，與你一起成長
+    index_html += """
+                </ul>
+            </div>
+            
+            <div class="sidebar">
+                <div class="section-title">📚 歷史歸檔</div>"""
+    
+    sorted_months = sorted(archive_by_month.keys(), reverse=True)
+    for month in sorted_months:
+        month_display = f"{month[:4]}年{int(month[5:7])}月"
+        index_html += f"""
+                <div class="archive-month">
+                    <div class="archive-month-title">{month_display}</div>
+                    <ul class="archive-list">"""
+        for article in archive_by_month[month][:8]:
+            index_html += f'<li><a href="{article["filename"]}">{article["title"][:25]}{"..." if len(article["title"]) > 25 else ""}</a></li>'
+        if len(archive_by_month[month]) > 8:
+            index_html += f'<li><a href="#" style="color:#aaa;">... 共{len(archive_by_month[month])}篇</a></li>'
+        index_html += """
+                    </ul>
+                </div>"""
+    
+    index_html += """
+            </div>
+        </div>
     </div>
+    
+    <script>
+        // 分類篩選功能
+        const filterBtns = document.querySelectorAll('.category-btn');
+        const pastItems = document.querySelectorAll('#pastList .past-item');
+        
+        filterBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const category = btn.dataset.category;
+                filterBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                pastItems.forEach(item => {
+                    if (category === 'all' || item.dataset.category === category) {
+                        item.style.display = '';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>"""
     
     index_path = os.path.join(daily_post_dir, "index.html")
     with open(index_path, "w", encoding="utf-8") as f:
-        f.write(index_content)
-    print(f"📑 已更新 daily-post/index.html (共 {len(articles)} 篇文章)")
+        f.write(index_html)
+    print(f"📑 已更新 daily-post/index.html (共 {len(articles)} 篇文章，最新: {latest['title']})")
 
 # ==================== 推送到網站倉庫 ====================
 def commit_and_push_to_website():
@@ -381,7 +538,6 @@ def commit_and_push_to_website():
         os.makedirs(daily_post_dir, exist_ok=True)
         print(f"📁 daily-post 目錄: {daily_post_dir}")
         
-        # 複製新文章
         article_copied = False
         if os.path.exists("articles"):
             for file in os.listdir("articles"):
@@ -396,42 +552,26 @@ def commit_and_push_to_website():
             print("⚠️ 沒有找到文章檔案")
             return
         
-        # 複製圖片（如果有）
         images_dir = os.path.join(daily_post_dir, "images")
         os.makedirs(images_dir, exist_ok=True)
         if os.path.exists("images"):
             for file in os.listdir("images"):
-                src = os.path.join("images", file)
-                dst = os.path.join(images_dir, file)
-                shutil.copy2(src, dst)
+                shutil.copy2(os.path.join("images", file), os.path.join(images_dir, file))
                 print(f"🖼️ 複製圖片: {file}")
         
-        # 產生索引頁面
         generate_daily_post_index(daily_post_dir)
         
-        # 提交並推送
         print("📤 提交並推送到 GitHub...")
         subprocess.run(["git", "config", "user.name", "jueji-bot"], cwd=website_dir, check=False)
         subprocess.run(["git", "config", "user.email", "bot@jueji.com"], cwd=website_dir, check=False)
         subprocess.run(["git", "add", "daily-post/"], cwd=website_dir, check=True)
         
-        status = subprocess.run(
-            ["git", "status", "--porcelain"],
-            cwd=website_dir,
-            capture_output=True,
-            text=True
-        )
+        status = subprocess.run(["git", "status", "--porcelain"], cwd=website_dir, capture_output=True, text=True)
         
         if status.stdout.strip():
             commit_msg = f"每日發文 {datetime.now().strftime('%Y-%m-%d')}"
             subprocess.run(["git", "commit", "-m", commit_msg], cwd=website_dir, check=False)
-            push_result = subprocess.run(
-                ["git", "push", "origin", "main"],
-                cwd=website_dir,
-                capture_output=True,
-                text=True
-            )
-            
+            push_result = subprocess.run(["git", "push", "origin", "main"], cwd=website_dir, capture_output=True, text=True)
             if push_result.returncode == 0:
                 print("✅ 成功推送到網站倉庫")
             else:
