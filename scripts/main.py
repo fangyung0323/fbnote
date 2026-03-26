@@ -4,7 +4,7 @@
 - 使用 DeepSeek API 生成文章（四大類別輪換：植物、永續、碳盤查、生活）
 - 將文章保存為 HTML
 - 推送到網站倉庫的 daily-post 目錄
-- 自動生成含類別分類的索引頁面
+- 自動生成含類別篩選、最新文章完整顯示、過往文章歸檔的索引頁面
 """
 
 import os
@@ -13,6 +13,7 @@ import json
 import subprocess
 import shutil
 import tempfile
+import re
 from datetime import datetime
 import requests
 
@@ -153,6 +154,9 @@ def save_article_as_html(title, content, category, output_dir="articles"):
     
     category_color = CATEGORY_COLORS.get(category, "#4a7c59")
     
+    # 將換行轉換為 <br>，同時保留段落結構
+    content_html = content.replace(chr(10), "<br>")
+    
     html_content = f"""<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -198,7 +202,7 @@ def save_article_as_html(title, content, category, output_dir="articles"):
     <h1>{title}</h1>
     <div class="date">📅 {datetime.now().strftime("%Y年%m月%d日")}</div>
     <div class="content">
-        {content.replace(chr(10), "<br>")}
+        {content_html}
     </div>
     <hr>
     <div class="footer">
@@ -217,32 +221,47 @@ def save_article_as_html(title, content, category, output_dir="articles"):
 
 # ==================== 索引頁面生成 ====================
 def generate_daily_post_index(daily_post_dir):
-    """產生 daily-post 目錄的索引頁面（含類別篩選、最新文章、側邊欄）"""
+    """產生 daily-post 目錄的索引頁面
+    上方四大類別連結，中間顯示最新一篇完整文章，右邊顯示過往文章連結
+    """
     articles = []
     for file in os.listdir(daily_post_dir):
         if file.endswith(".html") and file != "index.html":
-            # 嘗試從檔案內容讀取類別
             filepath = os.path.join(daily_post_dir, file)
+            
+            # 從檔案內容讀取類別和文章內容
             category = "未分類"
+            title = ""
+            content_html = ""
+            date_str = file[:10] if len(file) >= 10 else "0000-00-00"
+            
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
-                    content = f.read()
-                    import re
-                    match = re.search(r'<div class="category-tag">📌 (.+?)</div>', content)
-                    if match:
-                        category = match.group(1)
+                    full_content = f.read()
+                    
+                    # 提取類別
+                    match_cat = re.search(r'<div class="category-tag">📌 (.+?)</div>', full_content)
+                    if match_cat:
+                        category = match_cat.group(1)
+                    
+                    # 提取標題
+                    match_title = re.search(r'<h1>(.+?)</h1>', full_content)
+                    if match_title:
+                        title = match_title.group(1)
+                    
+                    # 提取文章主體內容
+                    match_content = re.search(r'<div class="content">(.*?)</div>', full_content, re.DOTALL)
+                    if match_content:
+                        content_html = match_content.group(1)
             except:
                 pass
-            
-            # 解析日期（從檔名）
-            date_str = file[:10] if len(file) >= 10 else "0000-00-00"
-            title = file.replace(".html", "").replace(date_str + "-", "").replace("-", " / ")
             
             articles.append({
                 "filename": file,
                 "date": date_str,
                 "title": title,
-                "category": category
+                "category": category,
+                "content": content_html
             })
     
     articles.sort(key=lambda x: x["date"], reverse=True)
@@ -250,19 +269,15 @@ def generate_daily_post_index(daily_post_dir):
     if not articles:
         return
     
-    # 按類別分組
-    articles_by_category = {cat: [] for cat in CATEGORIES}
-    articles_by_category["未分類"] = []
-    for article in articles:
-        cat = article["category"] if article["category"] in CATEGORIES else "未分類"
-        articles_by_category[cat].append(article)
+    # 最新一篇文章
+    latest = articles[0]
     
-    # 最新5篇文章
-    latest_articles = articles[:5]
+    # 其餘文章（過往文章）
+    past_articles = articles[1:]
     
-    # 生成側邊欄 HTML（過往文章按日期歸檔）
+    # 按年月歸檔過往文章
     archive_by_month = {}
-    for article in articles:
+    for article in past_articles:
         month_key = article["date"][:7]  # YYYY-MM
         if month_key not in archive_by_month:
             archive_by_month[month_key] = []
@@ -314,6 +329,9 @@ def generate_daily_post_index(daily_post_dir):
             text-decoration: none;
             font-weight: 500;
             transition: transform 0.2s;
+            cursor: pointer;
+            border: none;
+            font-size: 0.9rem;
         }}
         .category-btn:hover {{
             transform: translateY(-2px);
@@ -350,33 +368,75 @@ def generate_daily_post_index(daily_post_dir):
             padding-bottom: 0.5rem;
             margin-bottom: 1rem;
         }}
-        .article-list {{
+        /* 最新文章完整顯示 */
+        .latest-article {{
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }}
+        .latest-category {{
+            display: inline-block;
+            background: {CATEGORY_COLORS.get(latest['category'], "#6c757d")};
+            color: white;
+            padding: 0.2rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin-bottom: 1rem;
+        }}
+        .latest-title {{
+            font-size: 1.8rem;
+            color: #2c5e2e;
+            margin-bottom: 0.5rem;
+        }}
+        .latest-date {{
+            color: #7f8c6d;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+        }}
+        .latest-content {{
+            line-height: 1.8;
+            color: #2c3e2f;
+        }}
+        .latest-content p {{
+            margin: 1rem 0;
+        }}
+        .read-more {{
+            display: inline-block;
+            margin-top: 1rem;
+            color: #4a7c59;
+            text-decoration: none;
+            font-weight: 500;
+        }}
+        /* 過往文章列表 */
+        .past-list {{
             list-style: none;
             padding: 0;
         }}
-        .article-item {{
+        .past-item {{
             margin-bottom: 1rem;
             padding-bottom: 1rem;
             border-bottom: 1px solid #f0e8e0;
         }}
-        .article-link {{
-            font-size: 1rem;
+        .past-link {{
+            font-size: 0.95rem;
             font-weight: 500;
             color: #4a7c59;
             text-decoration: none;
             display: block;
         }}
-        .article-link:hover {{
+        .past-link:hover {{
             text-decoration: underline;
         }}
-        .article-meta {{
-            font-size: 0.75rem;
+        .past-meta {{
+            font-size: 0.7rem;
             color: #aaa;
             margin-top: 0.25rem;
         }}
-        .category-badge {{
+        .past-badge {{
             display: inline-block;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             padding: 0.1rem 0.5rem;
             border-radius: 12px;
             color: white;
@@ -416,6 +476,9 @@ def generate_daily_post_index(daily_post_dir):
             .main-layout {{
                 flex-direction: column;
             }}
+            .latest-title {{
+                font-size: 1.4rem;
+            }}
         }}
     </style>
 </head>
@@ -427,29 +490,41 @@ def generate_daily_post_index(daily_post_dir):
         </div>
         
         <div class="categories">
-            <a href="#" class="category-btn category-all" onclick="filterArticles('all')">📋 全部</a>
+            <button class="category-btn category-all" onclick="filterPastArticles('all')">📋 全部</button>
 """
     
     for cat in CATEGORIES:
         color_class = f"category-{cat}"
-        index_content += f'            <a href="#" class="category-btn {color_class}" onclick="filterArticles(\'{cat}\')">📌 {cat}</a>\n'
+        index_content += f'            <button class="category-btn {color_class}" onclick="filterPastArticles(\'{cat}\')">📌 {cat}</button>\n'
     
-    index_content += """        </div>
+    index_content += f"""
+        </div>
         
         <div class="main-layout">
             <div class="content-area">
-                <div class="section-title">📖 最新文章</div>
-                <ul class="article-list" id="article-list">
+                <!-- 最新文章：完整顯示 -->
+                <div class="latest-article">
+                    <div class="latest-category">📌 {latest['category']}</div>
+                    <h1 class="latest-title">{latest['title']}</h1>
+                    <div class="latest-date">📅 {latest['date']}</div>
+                    <div class="latest-content">
+                        {latest['content']}
+                    </div>
+                    <a href="{latest['filename']}" class="read-more">🔗 查看獨立頁面 →</a>
+                </div>
+                
+                <div class="section-title">📖 過往文章</div>
+                <ul class="past-list" id="past-list">
 """
     
-    # 最新文章列表（全部顯示）
-    for article in latest_articles:
+    # 過往文章列表（可篩選）
+    for article in past_articles[:20]:  # 顯示最近20篇
         cat_color = CATEGORY_COLORS.get(article["category"], "#6c757d")
         index_content += f"""
-                    <li class="article-item" data-category="{article['category']}">
-                        <span class="category-badge" style="background: {cat_color};">{article['category']}</span>
-                        <a class="article-link" href="{article['filename']}">{article['title']}</a>
-                        <div class="article-meta">📅 {article['date']}</div>
+                    <li class="past-item" data-category="{article['category']}">
+                        <span class="past-badge" style="background: {cat_color};">{article['category']}</span>
+                        <a class="past-link" href="{article['filename']}">{article['title']}</a>
+                        <div class="past-meta">📅 {article['date']}</div>
                     </li>"""
     
     index_content += """
@@ -457,10 +532,10 @@ def generate_daily_post_index(daily_post_dir):
             </div>
             
             <div class="sidebar">
-                <div class="section-title">📚 過往文章</div>
+                <div class="section-title">📚 歷史歸檔</div>
 """
     
-    # 過往文章（按月歸檔）
+    # 過往文章按月歸檔
     sorted_months = sorted(archive_by_month.keys(), reverse=True)
     for month in sorted_months:
         month_display = f"{month[:4]}年{int(month[5:7])}月"
@@ -468,9 +543,9 @@ def generate_daily_post_index(daily_post_dir):
                 <div class="archive-month">
                     <div class="archive-month-title">{month_display}</div>
                     <ul class="archive-list">"""
-        for article in archive_by_month[month][:10]:  # 每個月最多顯示10篇
-            index_content += f'<li><a href="{article["filename"]}">{article["title"][:30]}{"..." if len(article["title"]) > 30 else ""}</a></li>'
-        if len(archive_by_month[month]) > 10:
+        for article in archive_by_month[month][:8]:  # 每個月最多顯示8篇
+            index_content += f'<li><a href="{article["filename"]}">{article["title"][:25]}{"..." if len(article["title"]) > 25 else ""}</a></li>'
+        if len(archive_by_month[month]) > 8:
             index_content += f'<li><a href="#" style="color:#aaa;">... 共{len(archive_by_month[month])}篇</a></li>'
         index_content += """
                     </ul>
@@ -484,8 +559,8 @@ def generate_daily_post_index(daily_post_dir):
     </div>
     
     <script>
-        function filterArticles(category) {
-            const items = document.querySelectorAll('#article-list .article-item');
+        function filterPastArticles(category) {
+            const items = document.querySelectorAll('#past-list .past-item');
             items.forEach(item => {
                 if (category === 'all' || item.dataset.category === category) {
                     item.style.display = '';
@@ -571,7 +646,7 @@ def commit_and_push_to_website():
                 shutil.copy2(src, dst)
                 print(f"🖼️ 複製圖片: {file}")
         
-        # 產生索引頁面（包含類別篩選、最新文章、過往文章側邊欄）
+        # 產生索引頁面（包含類別篩選、最新文章完整顯示、過往文章歸檔）
         generate_daily_post_index(daily_post_dir)
         
         # 提交並推送
