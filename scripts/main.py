@@ -816,27 +816,40 @@ def generate_daily_post_index(daily_post_dir):
     
     {get_footer_html()}
     
-    <script>{get_nav_script()}
+   <script>
     // 分類篩選功能
-    const filterBtns = document.querySelectorAll('.category-btn');
-    const pastItems = document.querySelectorAll('#pastList .past-item');
+    function filterArticles() {
+        const activeBtn = document.querySelector('.category-btn.active');
+        const category = activeBtn ? activeBtn.getAttribute('data-category') : 'all';
+        const pastItems = document.querySelectorAll('#pastList .past-item');
+        
+        pastItems.forEach(item => {
+            if (category === 'all' || item.getAttribute('data-category') === category) {
+                item.style.display = '';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
     
-    filterBtns.forEach(btn => {{
-        btn.addEventListener('click', () => {{
-            const category = btn.dataset.category;
+    // 綁定按鈕事件
+    const filterBtns = document.querySelectorAll('.category-btn');
+    filterBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            // 移除所有按鈕的 active 類別
             filterBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            
-            pastItems.forEach(item => {{
-                if (category === 'all' || item.dataset.category === category) {{
-                    item.style.display = '';
-                }} else {{
-                    item.style.display = 'none';
-                }}
-            }});
-        }});
-    }});
-    </script>
+            // 為當前按鈕添加 active 類別
+            this.classList.add('active');
+            // 執行篩選
+            filterArticles();
+        });
+    });
+    
+    // 頁面載入後執行一次，確保初始狀態正確
+    document.addEventListener('DOMContentLoaded', function() {
+        filterArticles();
+    });
+</script>
 </body>
 </html>"""
     
