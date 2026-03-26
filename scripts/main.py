@@ -2,7 +2,6 @@
 """
 每日自動發文機器人
 - 使用 DeepSeek API 生成文章（四大類別輪換：植物、永續、碳盤查、生活）
-- 支援手動觸發時選擇類別
 - 將文章保存為 HTML（套用官網模板）
 - 推送到網站倉庫的 daily-post 目錄
 - 自動生成套用官網模板的索引頁面
@@ -92,15 +91,7 @@ SYSTEM_PROMPTS = {
 }
 
 def get_today_category():
-    """根據手動觸發或日期決定類別"""
-    manual = os.getenv("MANUAL_CATEGORY")
-    
-    # 如果手動選擇了特定類別（且不是「自動」）
-    if manual and manual != "自動（依日期輪換）" and manual in CATEGORIES:
-        print(f"📌 手動選擇類別：{manual}")
-        return manual
-    
-    # 否則依日期輪換
+    """根據日期決定今天的主題類別（四個類別輪換）"""
     day_of_year = datetime.now().timetuple().tm_yday
     category_index = (day_of_year - 1) % len(CATEGORIES)
     return CATEGORIES[category_index]
@@ -371,11 +362,12 @@ def get_footer_html():
   </footer>"""
 
 def get_nav_script():
-    """返回導覽列載入腳本（使用絕對路徑）"""
+    """返回導覽列載入腳本（使用絕對路徑修正連結）"""
     return """document.addEventListener('DOMContentLoaded', function () {
       fetch('/nav.html')
         .then(response => response.text())
         .then(data => {
+          // 修正導覽列中的連結，加上前綴 /
           let fixedData = data.replace(/href="(?!https?:\/\/|\/)([^"]+)"/g, 'href="/$1"');
           fixedData = fixedData.replace(/href="\/([^"]+)"/g, 'href="/$1"');
           document.getElementById('nav-placeholder').innerHTML = fixedData;
@@ -487,12 +479,13 @@ def save_article_as_html(title, content, category, output_dir="articles"):
     category_color = CATEGORY_COLORS.get(category, "#4a7c59")
     content_html = content.replace(chr(10), "<br>")
     
+    # 套用官網模板的獨立文章頁面
     html_content = f"""<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title} - 蕨積每日文章</title>
+    <title>{title}蕨積 - 每日文章</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -561,6 +554,8 @@ def save_article_as_html(title, content, category, output_dir="articles"):
                 每日一篇，與你一起成長
             </div>
             <a href="index.html" class="back-link">← 返回文章列表</a>
+            <a href="../forever.html" class="back-link">永續淨零</a>
+            <a href="../greenlab.html" class="back-link">綠色實驗室</a>
         </div>
     </main>
     
@@ -578,9 +573,12 @@ def save_article_as_html(title, content, category, output_dir="articles"):
 
 # ==================== 索引頁面生成（套用官網模板） ====================
 def generate_daily_post_index(daily_post_dir):
-    """產生 daily-post 目錄的索引頁面"""
+    """產生 daily-post 目錄的索引頁面
+    套用官網模板樣式，所有內容放在 <main> 內
+    """
     articles = []
     for file in os.listdir(daily_post_dir):
+        # 只處理以日期開頭的 HTML 檔案 (格式: YYYY-MM-DD-*.html)
         if file.endswith(".html") and file != "index.html" and len(file) >= 10 and file[4] == '-' and file[7] == '-':
             filepath = os.path.join(daily_post_dir, file)
             
@@ -593,18 +591,12 @@ def generate_daily_post_index(daily_post_dir):
                 with open(filepath, "r", encoding="utf-8") as f:
                     full_content = f.read()
                     match_cat = re.search(r'<div class="article-category">📌 (.+?)</div>', full_content)
-                    if not match_cat:
-                        match_cat = re.search(r'<div class="category-tag">📌 (.+?)</div>', full_content)
                     if match_cat:
                         category = match_cat.group(1)
                     match_title = re.search(r'<h1 class="article-title">(.+?)</h1>', full_content)
-                    if not match_title:
-                        match_title = re.search(r'<h1>(.+?)</h1>', full_content)
                     if match_title:
                         title = match_title.group(1)
                     match_content = re.search(r'<div class="article-content">(.*?)</div>', full_content, re.DOTALL)
-                    if not match_content:
-                        match_content = re.search(r'<div class="content">(.*?)</div>', full_content, re.DOTALL)
                     if match_content:
                         content_html = match_content.group(1)
             except:
@@ -627,17 +619,18 @@ def generate_daily_post_index(daily_post_dir):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>蕨積每日文章</title>
+    <title>蕨積 - 每日文章</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>{get_template_styles()}</style>
 </head>
 <body>
     <div id="nav-placeholder"></div>
     <main class="content">
-        <div style="text-align:center;padding:60px 20px;">
-            <h1 style="font-family:'Noto Serif TC',serif;color:var(--moss);">🌿 蕨積每日文章</h1>
-            <p style="color:var(--stone);margin-top:1rem;">📭 目前還沒有文章，等待機器人發文中...</p>
+        <div style="text-align: center; padding: 60px 20px;">
+            <h1 style="font-family: 'Noto Serif TC', serif; color: var(--moss);">🌿 蕨積每日文章</h1>
+            <p style="color: var(--stone); margin-top: 1rem;">📭 目前還沒有文章，等待機器人發文中...</p>
         </div>
     </main>
     {get_footer_html()}
@@ -660,38 +653,7 @@ def generate_daily_post_index(daily_post_dir):
             archive_by_month[month_key] = []
         archive_by_month[month_key].append(article)
     
-    # 生成過往文章列表 HTML
-    past_list_html = ""
-    for article in past_articles[:30]:
-        cat_color = CATEGORY_COLORS.get(article["category"], "#6c757d")
-        past_list_html += f"""
-                        <li class="past-item" data-category="{article['category']}">
-                            <span class="past-badge" style="background: {cat_color};">{article['category']}</span>
-                            <a class="past-link" href="{article['filename']}">{article['title']}</a>
-                            <div class="past-meta">📅 {article['date']}</div>
-                        </li>"""
-    
-    # 生成歸檔 HTML
-    archive_html = ""
-    sorted_months = sorted(archive_by_month.keys(), reverse=True)
-    for month in sorted_months:
-        month_display = f"{month[:4]}年{int(month[5:7])}月"
-        archive_html += f"""
-                    <div class="archive-month">
-                        <div class="archive-month-title">{month_display}</div>
-                        <ul class="archive-list">"""
-        for article in archive_by_month[month][:8]:
-            archive_html += f'<li><a href="{article["filename"]}">{article["title"][:25]}{"..." if len(article["title"]) > 25 else ""}</a></li>'
-        if len(archive_by_month[month]) > 8:
-            archive_html += f'<li><a href="#" style="color:#aaa;">... 共{len(archive_by_month[month])}篇</a></li>'
-        archive_html += """
-                        </ul>
-                    </div>"""
-    
-    # 最新文章類別顏色
-    latest_cat_color = CATEGORY_COLORS.get(latest['category'], "#6c757d")
-    
-    # 生成完整 HTML（使用 f-string，但要小心 JavaScript 中的大括號）
+    # 生成完整 HTML
     index_html = f"""<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -728,6 +690,10 @@ def generate_daily_post_index(daily_post_dir):
     }}
     .category-btn:hover {{ transform: translateY(-2px); }}
     .category-btn.active {{ background: #4a7c59; color: white; }}
+    .category-植物.active {{ background: #4a7c59; }}
+    .category-永續.active {{ background: #2c7a4d; }}
+    .category-碳盤查.active {{ background: #1e6f5c; }}
+    .category-生活.active {{ background: #b88b4a; }}
     
     .two-columns {{ display: flex; gap: 2rem; flex-wrap: wrap; }}
     .main-col {{ flex: 3; min-width: 250px; }}
@@ -742,7 +708,7 @@ def generate_daily_post_index(daily_post_dir):
     }}
     .latest-category {{
         display: inline-block;
-        background: {latest_cat_color};
+        background: {CATEGORY_COLORS.get(latest['category'], '#6c757d')};
         color: white;
         padding: 0.2rem 0.8rem;
         border-radius: 20px;
@@ -781,16 +747,16 @@ def generate_daily_post_index(daily_post_dir):
     <main class="content">
         <div class="daily-container">
             <div class="page-header">
-                <h1>🌿 蕨積每日文章</h1>
-                <p>植物・永續・碳盤查・生活 — 每天一篇，與你一起成長</p>
+                <h1> 蕨積每日文章 </h1>
+                <p>每天一篇，與您一起成長</p>
             </div>
             
             <div class="categories">
                 <button class="category-btn active" data-category="all">📋 全部</button>
-                <button class="category-btn" data-category="植物">🌿 植物</button>
-                <button class="category-btn" data-category="永續">♻️ 永續</button>
-                <button class="category-btn" data-category="碳盤查">📊 碳盤查</button>
-                <button class="category-btn" data-category="生活">🏡 生活</button>
+                <button class="category-btn category-植物" data-category="植物">🌿 植物</button>
+                <button class="category-btn category-永續" data-category="永續">♻️ 永續</button>
+                <button class="category-btn category-碳盤查" data-category="碳盤查">📊 碳盤查</button>
+                <button class="category-btn category-生活" data-category="生活">🏡 生活</button>
             </div>
             
             <div class="two-columns">
@@ -804,14 +770,40 @@ def generate_daily_post_index(daily_post_dir):
                     </div>
                     
                     <div class="section-title">📖 過往文章</div>
-                    <ul class="past-list" id="pastList">
-                        {past_list_html}
+                    <ul class="past-list" id="pastList">"""
+    
+    for article in past_articles[:30]:
+        cat_color = CATEGORY_COLORS.get(article["category"], "#6c757d")
+        index_html += f"""
+                        <li class="past-item" data-category="{article['category']}">
+                            <span class="past-badge" style="background: {cat_color};">{article['category']}</span>
+                            <a class="past-link" href="{article['filename']}">{article['title']}</a>
+                            <div class="past-meta">📅 {article['date']}</div>
+                        </li>"""
+    
+    index_html += """
                     </ul>
                 </div>
                 
                 <div class="sidebar-col">
-                    <div class="section-title">📚 歷史歸檔</div>
-                    {archive_html}
+                    <div class="section-title">📚 歷史歸檔</div>"""
+    
+    sorted_months = sorted(archive_by_month.keys(), reverse=True)
+    for month in sorted_months:
+        month_display = f"{month[:4]}年{int(month[5:7])}月"
+        index_html += f"""
+                    <div class="archive-month">
+                        <div class="archive-month-title">{month_display}</div>
+                        <ul class="archive-list">"""
+        for article in archive_by_month[month][:8]:
+            index_html += f'<li><a href="{article["filename"]}">{article["title"][:25]}{"..." if len(article["title"]) > 25 else ""}</a></li>'
+        if len(archive_by_month[month]) > 8:
+            index_html += f'<li><a href="#" style="color:#aaa;">... 共{len(archive_by_month[month])}篇</a></li>'
+        index_html += """
+                        </ul>
+                    </div>"""
+    
+    index_html += f"""
                 </div>
             </div>
         </div>
@@ -819,39 +811,27 @@ def generate_daily_post_index(daily_post_dir):
     
     {get_footer_html()}
     
-    <script>
-        // 分類篩選功能
-        (function() {{
-            const filterBtns = document.querySelectorAll('.category-btn');
-            const pastItems = document.querySelectorAll('#pastList .past-item');
-            
-            function filterArticles() {{
-                const activeBtn = document.querySelector('.category-btn.active');
-                const category = activeBtn ? activeBtn.getAttribute('data-category') : 'all';
-                
-                pastItems.forEach(item => {{
-                    if (category === 'all' || item.getAttribute('data-category') === category) {{
-                        item.style.display = '';
-                    }} else {{
-                        item.style.display = 'none';
-                    }}
-                }});
-            }}
-            
-            filterBtns.forEach(btn => {{
-                btn.addEventListener('click', function() {{
-                    filterBtns.forEach(b => b.classList.remove('active'));
-                    this.classList.add('active');
-                    filterArticles();
-                }});
-            }});
-            
-            // 初始執行一次
-            filterArticles();
-        }})();
-    </script>
+    <script>{get_nav_script()}
+    // 分類篩選功能
+    const filterBtns = document.querySelectorAll('.category-btn');
+    const pastItems = document.querySelectorAll('#pastList .past-item');
     
-    {get_nav_script()}
+    filterBtns.forEach(btn => {{
+        btn.addEventListener('click', () => {{
+            const category = btn.dataset.category;
+            filterBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            pastItems.forEach(item => {{
+                if (category === 'all' || item.dataset.category === category) {{
+                    item.style.display = '';
+                }} else {{
+                    item.style.display = 'none';
+                }}
+            }});
+        }});
+    }});
+    </script>
 </body>
 </html>"""
     
