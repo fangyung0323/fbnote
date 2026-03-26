@@ -2,6 +2,7 @@
 """
 每日自動發文機器人
 - 使用 DeepSeek API 生成文章（四大類別輪換：植物、永續、碳盤查、生活）
+- 支援手動觸發時選擇類別
 - 將文章保存為 HTML（套用官網模板）
 - 推送到網站倉庫的 daily-post 目錄
 - 自動生成套用官網模板的索引頁面
@@ -42,7 +43,7 @@ PROMPT_TEMPLATES = {
 
 要求：
 1. 標題要吸引人
-2. 內容約 400-600 字
+2. 內容約 500-800 字
 3. 語言使用繁體中文
 4. 結尾加上「🌿 蕨積 - 讓生活多一點綠」""",
 
@@ -54,7 +55,7 @@ PROMPT_TEMPLATES = {
 
 要求：
 1. 標題要吸引人
-2. 內容約 400-600 字
+2. 內容約 500-800 字
 3. 語言使用繁體中文
 4. 結尾加上「🌿 蕨積 - 讓生活多一點綠」""",
 
@@ -66,7 +67,7 @@ PROMPT_TEMPLATES = {
 
 要求：
 1. 標題要吸引人
-2. 內容約 400-600 字
+2. 內容約 500-800 字
 3. 語言使用繁體中文
 4. 結尾加上「🌿 蕨積 - 讓生活多一點綠」""",
 
@@ -78,7 +79,7 @@ PROMPT_TEMPLATES = {
 
 要求：
 1. 標題要吸引人
-2. 內容約 400-600 字
+2. 內容約 500-800 字
 3. 語言使用繁體中文
 4. 結尾加上「🌿 蕨積 - 讓生活多一點綠」"""
 }
@@ -91,7 +92,15 @@ SYSTEM_PROMPTS = {
 }
 
 def get_today_category():
-    """根據日期決定今天的主題類別（四個類別輪換）"""
+    """根據手動觸發或日期決定類別"""
+    manual = os.getenv("MANUAL_CATEGORY")
+    
+    # 如果手動選擇了特定類別（且不是「自動」）
+    if manual and manual != "自動（依日期輪換）" and manual in CATEGORIES:
+        print(f"📌 手動選擇類別：{manual}")
+        return manual
+    
+    # 否則依日期輪換
     day_of_year = datetime.now().timetuple().tm_yday
     category_index = (day_of_year - 1) % len(CATEGORIES)
     return CATEGORIES[category_index]
@@ -362,12 +371,11 @@ def get_footer_html():
   </footer>"""
 
 def get_nav_script():
-    """返回導覽列載入腳本（使用絕對路徑修正連結）"""
+    """返回導覽列載入腳本（使用絕對路徑）"""
     return """document.addEventListener('DOMContentLoaded', function () {
       fetch('/nav.html')
         .then(response => response.text())
         .then(data => {
-          // 修正導覽列中的連結，加上前綴 /
           let fixedData = data.replace(/href="(?!https?:\/\/|\/)([^"]+)"/g, 'href="/$1"');
           fixedData = fixedData.replace(/href="\/([^"]+)"/g, 'href="/$1"');
           document.getElementById('nav-placeholder').innerHTML = fixedData;
@@ -479,13 +487,12 @@ def save_article_as_html(title, content, category, output_dir="articles"):
     category_color = CATEGORY_COLORS.get(category, "#4a7c59")
     content_html = content.replace(chr(10), "<br>")
     
-    # 套用官網模板的獨立文章頁面
     html_content = f"""<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title}蕨積 - 每日文章</title>
+    <title>{title} - 蕨積每日文章</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -554,8 +561,6 @@ def save_article_as_html(title, content, category, output_dir="articles"):
                 每日一篇，與你一起成長
             </div>
             <a href="index.html" class="back-link">← 返回文章列表</a>
-            <a href="../forever.html" class="back-link">永續淨零</a>
-            <a href="../greenlab.html" class="back-link">綠色實驗室</a>
         </div>
     </main>
     
@@ -619,7 +624,7 @@ def generate_daily_post_index(daily_post_dir):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>蕨積 - 每日文章</title>
+    <title>蕨積每日文章 - 生活隨筆</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -747,8 +752,8 @@ def generate_daily_post_index(daily_post_dir):
     <main class="content">
         <div class="daily-container">
             <div class="page-header">
-                <h1> 蕨積每日文章 </h1>
-                <p>每天一篇，與您一起成長</p>
+                <h1>🌿 蕨積每日文章</h1>
+                <p>植物・永續・碳盤查・生活 — 每天一篇，與你一起成長</p>
             </div>
             
             <div class="categories">
