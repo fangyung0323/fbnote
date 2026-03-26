@@ -686,116 +686,170 @@ def generate_daily_post_index(daily_post_dir):
     # 最新文章類別顏色
     latest_cat_color = CATEGORY_COLORS.get(latest['category'], "#6c757d")
     
-    # 生成完整 HTML
-    index_html = f"""<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>蕨積每日文章 - 植物・永續・碳盤查・生活</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>{get_template_styles()}
-    /* ===== 每日文章專用樣式 ===== */
-    .daily-container {{ max-width: 1200px; margin: 0 auto; padding: 0 2rem; }}
-    .page-header {{ text-align: center; margin-bottom: 2rem; }}
-    .page-header h1 {{ color: var(--moss); font-size: 2rem; font-family: 'Noto Serif TC', serif; }}
-    .page-header p {{ color: var(--stone); margin-top: 0.5rem; }}
+    # 生成完整 HTML（使用普通字串拼接）
+    index_html = '<!DOCTYPE html>\n'
+    index_html += '<html lang="zh-TW">\n'
+    index_html += '<head>\n'
+    index_html += '    <meta charset="UTF-8">\n'
+    index_html += '    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
+    index_html += '    <title>蕨積每日文章 - 植物・永續・碳盤查・生活</title>\n'
+    index_html += '    <link rel="preconnect" href="https://fonts.googleapis.com">\n'
+    index_html += '    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">\n'
+    index_html += '    <script src="https://unpkg.com/lucide@latest"></script>\n'
+    index_html += '    <style>' + get_template_styles() + '\n'
+    index_html += '    /* ===== 每日文章專用樣式 ===== */\n'
+    index_html += '    .daily-container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; }\n'
+    index_html += '    .page-header { text-align: center; margin-bottom: 2rem; }\n'
+    index_html += '    .page-header h1 { color: var(--moss); font-size: 2rem; font-family: "Noto Serif TC", serif; }\n'
+    index_html += '    .page-header p { color: var(--stone); margin-top: 0.5rem; }\n'
+    index_html += '    \n'
+    index_html += '    .categories {\n'
+    index_html += '        display: flex;\n'
+    index_html += '        justify-content: center;\n'
+    index_html += '        gap: 1rem;\n'
+    index_html += '        flex-wrap: wrap;\n'
+    index_html += '        margin-bottom: 2rem;\n'
+    index_html += '    }\n'
+    index_html += '    .category-btn {\n'
+    index_html += '        padding: 0.5rem 1.5rem;\n'
+    index_html += '        border-radius: 30px;\n'
+    index_html += '        border: none;\n'
+    index_html += '        cursor: pointer;\n'
+    index_html += '        font-size: 0.9rem;\n'
+    index_html += '        font-weight: 500;\n'
+    index_html += '        transition: transform 0.2s;\n'
+    index_html += '        background: #e8e0d8;\n'
+    index_html += '        color: #4a5b4e;\n'
+    index_html += '    }\n'
+    index_html += '    .category-btn:hover { transform: translateY(-2px); }\n'
+    index_html += '    .category-btn.active { background: #4a7c59; color: white; }\n'
+    index_html += '    \n'
+    index_html += '    .two-columns { display: flex; gap: 2rem; flex-wrap: wrap; }\n'
+    index_html += '    .main-col { flex: 3; min-width: 250px; }\n'
+    index_html += '    .sidebar-col { flex: 1; min-width: 200px; background: white; border-radius: 16px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: fit-content; }\n'
+    index_html += '    \n'
+    index_html += '    .latest-article {\n'
+    index_html += '        background: white;\n'
+    index_html += '        border-radius: 16px;\n'
+    index_html += '        padding: 2rem;\n'
+    index_html += '        margin-bottom: 2rem;\n'
+    index_html += '        box-shadow: 0 2px 12px rgba(0,0,0,0.08);\n'
+    index_html += '    }\n'
+    index_html += '    .latest-category {\n'
+    index_html += '        display: inline-block;\n'
+    index_html += '        background: ' + latest_cat_color + ';\n'
+    index_html += '        color: white;\n'
+    index_html += '        padding: 0.2rem 0.8rem;\n'
+    index_html += '        border-radius: 20px;\n'
+    index_html += '        font-size: 0.8rem;\n'
+    index_html += '        margin-bottom: 1rem;\n'
+    index_html += '    }\n'
+    index_html += '    .latest-title { font-size: 1.8rem; color: var(--moss); margin-bottom: 0.5rem; }\n'
+    index_html += '    .latest-date { color: var(--stone); margin-bottom: 1.5rem; font-size: 0.9rem; }\n'
+    index_html += '    .latest-content { line-height: 1.8; }\n'
+    index_html += '    .read-more { display: inline-block; margin-top: 1rem; color: var(--fern); text-decoration: none; font-weight: 500; }\n'
+    index_html += '    \n'
+    index_html += '    .section-title { font-size: 1.2rem; color: var(--moss); border-bottom: 2px solid #e0d6cc; padding-bottom: 0.5rem; margin-bottom: 1rem; }\n'
+    index_html += '    .past-list { list-style: none; }\n'
+    index_html += '    .past-item { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #f0e8e0; }\n'
+    index_html += '    .past-link { font-size: 0.95rem; font-weight: 500; color: var(--fern); text-decoration: none; display: block; }\n'
+    index_html += '    .past-link:hover { text-decoration: underline; }\n'
+    index_html += '    .past-meta { font-size: 0.7rem; color: #aaa; margin-top: 0.25rem; }\n'
+    index_html += '    .past-badge { display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.5rem; border-radius: 12px; color: white; margin-right: 0.5rem; }\n'
+    index_html += '    .archive-month { margin-bottom: 1rem; }\n'
+    index_html += '    .archive-month-title { font-weight: 600; color: var(--moss); margin-bottom: 0.5rem; }\n'
+    index_html += '    .archive-list { list-style: none; padding-left: 0.5rem; }\n'
+    index_html += '    .archive-list li { margin-bottom: 0.3rem; }\n'
+    index_html += '    .archive-list a { color: var(--stone); text-decoration: none; font-size: 0.85rem; }\n'
+    index_html += '    .archive-list a:hover { color: var(--fern); text-decoration: underline; }\n'
+    index_html += '    \n'
+    index_html += '    @media (max-width: 768px) {\n'
+    index_html += '        .two-columns { flex-direction: column; }\n'
+    index_html += '        .latest-title { font-size: 1.4rem; }\n'
+    index_html += '        .daily-container { padding: 0 1rem; }\n'
+    index_html += '    }\n'
+    index_html += '    </style>\n'
+    index_html += '</head>\n'
+    index_html += '<body>\n'
+    index_html += '    <div id="nav-placeholder"></div>\n'
+    index_html += '    \n'
+    index_html += '    <main class="content">\n'
+    index_html += '        <div class="daily-container">\n'
+    index_html += '            <div class="page-header">\n'
+    index_html += '                <h1>🌿 蕨積每日文章</h1>\n'
+    index_html += '                <p>植物・永續・碳盤查・生活 — 每天一篇，與你一起成長</p>\n'
+    index_html += '            </div>\n'
+    index_html += '            \n'
+    index_html += '            <div class="categories">\n'
+    index_html += '                <button class="category-btn active" data-category="all">📋 全部</button>\n'
+    index_html += '                <button class="category-btn" data-category="植物">🌿 植物</button>\n'
+    index_html += '                <button class="category-btn" data-category="永續">♻️ 永續</button>\n'
+    index_html += '                <button class="category-btn" data-category="碳盤查">📊 碳盤查</button>\n'
+    index_html += '                <button class="category-btn" data-category="生活">🏡 生活</button>\n'
+    index_html += '            </div>\n'
+    index_html += '            \n'
+    index_html += '            <div class="two-columns">\n'
+    index_html += '                <div class="main-col">\n'
+    index_html += '                    <div class="latest-article">\n'
+    index_html += '                        <div class="latest-category">📌 ' + latest['category'] + '</div>\n'
+    index_html += '                        <h1 class="latest-title">' + latest['title'] + '</h1>\n'
+    index_html += '                        <div class="latest-date">📅 ' + latest['date'] + '</div>\n'
+    index_html += '                        <div class="latest-content">' + latest['content'] + '</div>\n'
+    index_html += '                        <a href="' + latest['filename'] + '" class="read-more">🔗 查看獨立頁面 →</a>\n'
+    index_html += '                    </div>\n'
+    index_html += '                    \n'
+    index_html += '                    <div class="section-title">📖 過往文章</div>\n'
+    index_html += '                    <ul class="past-list" id="pastList">\n'
+    index_html += past_list_html
+    index_html += '                    </ul>\n'
+    index_html += '                </div>\n'
+    index_html += '                \n'
+    index_html += '                <div class="sidebar-col">\n'
+    index_html += '                    <div class="section-title">📚 歷史歸檔</div>\n'
+    index_html += archive_html
+    index_html += '                </div>\n'
+    index_html += '            </div>\n'
+    index_html += '        </div>\n'
+    index_html += '    </main>\n'
+    index_html += '    \n'
+    index_html += get_footer_html()
+    index_html += '    \n'
+    index_html += '    <script>\n'
+    index_html += get_nav_script()
+    index_html += '\n'
+    index_html += '    // 分類篩選功能\n'
+    index_html += '    (function() {\n'
+    index_html += '        const filterBtns = document.querySelectorAll(".category-btn");\n'
+    index_html += '        const pastItems = document.querySelectorAll("#pastList .past-item");\n'
+    index_html += '        \n'
+    index_html += '        function filterArticles() {\n'
+    index_html += '            const activeBtn = document.querySelector(".category-btn.active");\n'
+    index_html += '            const category = activeBtn ? activeBtn.getAttribute("data-category") : "all";\n'
+    index_html += '            \n'
+    index_html += '            pastItems.forEach(item => {\n'
+    index_html += '                if (category === "all" || item.getAttribute("data-category") === category) {\n'
+    index_html += '                    item.style.display = "";\n'
+    index_html += '                } else {\n'
+    index_html += '                    item.style.display = "none";\n'
+    index_html += '                }\n'
+    index_html += '            });\n'
+    index_html += '        }\n'
+    index_html += '        \n'
+    index_html += '        filterBtns.forEach(btn => {\n'
+    index_html += '            btn.addEventListener("click", function() {\n'
+    index_html += '                filterBtns.forEach(b => b.classList.remove("active"));\n'
+    index_html += '                this.classList.add("active");\n'
+    index_html += '                filterArticles();\n'
+    index_html += '            });\n'
+    index_html += '        });\n'
+    index_html += '        \n'
+    index_html += '        filterArticles();\n'
+    index_html += '    })();\n'
+    index_html += '    </script>\n'
+    index_html += '</body>\n'
+    index_html += '</html>'
     
-    .categories {{
-        display: flex;
-        justify-content: center;
-        gap: 1rem;
-        flex-wrap: wrap;
-        margin-bottom: 2rem;
-    }}
-    .category-btn {{
-        padding: 0.5rem 1.5rem;
-        border-radius: 30px;
-        border: none;
-        cursor: pointer;
-        font-size: 0.9rem;
-        font-weight: 500;
-        transition: transform 0.2s;
-        background: #e8e0d8;
-        color: #4a5b4e;
-    }}
-    .category-btn:hover {{ transform: translateY(-2px); }}
-    .category-btn.active {{ background: #4a7c59; color: white; }}
-    
-    .two-columns {{ display: flex; gap: 2rem; flex-wrap: wrap; }}
-    .main-col {{ flex: 3; min-width: 250px; }}
-    .sidebar-col {{ flex: 1; min-width: 200px; background: white; border-radius: 16px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: fit-content; }}
-    
-    .latest-article {{
-        background: white;
-        border-radius: 16px;
-        padding: 2rem;
-        margin-bottom: 2rem;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-    }}
-    .latest-category {{
-        display: inline-block;
-        background: {latest_cat_color};
-        color: white;
-        padding: 0.2rem 0.8rem;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        margin-bottom: 1rem;
-    }}
-    .latest-title {{ font-size: 1.8rem; color: var(--moss); margin-bottom: 0.5rem; }}
-    .latest-date {{ color: var(--stone); margin-bottom: 1.5rem; font-size: 0.9rem; }}
-    .latest-content {{ line-height: 1.8; }}
-    .read-more {{ display: inline-block; margin-top: 1rem; color: var(--fern); text-decoration: none; font-weight: 500; }}
-    
-    .section-title {{ font-size: 1.2rem; color: var(--moss); border-bottom: 2px solid #e0d6cc; padding-bottom: 0.5rem; margin-bottom: 1rem; }}
-    .past-list {{ list-style: none; }}
-    .past-item {{ margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #f0e8e0; }}
-    .past-link {{ font-size: 0.95rem; font-weight: 500; color: var(--fern); text-decoration: none; display: block; }}
-    .past-link:hover {{ text-decoration: underline; }}
-    .past-meta {{ font-size: 0.7rem; color: #aaa; margin-top: 0.25rem; }}
-    .past-badge {{ display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.5rem; border-radius: 12px; color: white; margin-right: 0.5rem; }}
-    .archive-month {{ margin-bottom: 1rem; }}
-    .archive-month-title {{ font-weight: 600; color: var(--moss); margin-bottom: 0.5rem; }}
-    .archive-list {{ list-style: none; padding-left: 0.5rem; }}
-    .archive-list li {{ margin-bottom: 0.3rem; }}
-    .archive-list a {{ color: var(--stone); text-decoration: none; font-size: 0.85rem; }}
-    .archive-list a:hover {{ color: var(--fern); text-decoration: underline; }}
-    
-    @media (max-width: 768px) {{
-        .two-columns {{ flex-direction: column; }}
-        .latest-title {{ font-size: 1.4rem; }}
-        .daily-container {{ padding: 0 1rem; }}
-    }}
-    </style>
-</head>
-<body>
-    <div id="nav-placeholder"></div>
-    
-    <main class="content">
-        <div class="daily-container">
-            <div class="page-header">
-                <h1>🌿 蕨積每日文章</h1>
-                <p>植物・永續・碳盤查・生活 — 每天一篇，與你一起成長</p>
-            </div>
-            
-            <div class="categories">
-                <button class="category-btn active" data-category="all">📋 全部</button>
-                <button class="category-btn" data-category="植物">🌿 植物</button>
-                <button class="category-btn" data-category="永續">♻️ 永續</button>
-                <button class="category-btn" data-category="碳盤查">📊 碳盤查</button>
-                <button class="category-btn" data-category="生活">🏡 生活</button>
-            </div>
-            
-            <div class="two-columns">
-                <div class="main-col">
-                    <div class="latest-article">
-                        <div class="latest-category">📌 {latest['category']}</div>
-                        <h1 class="latest-title">{latest['title']}</h1>
-                        <div class="latest-date">📅 {latest['date']}</div>
-                        <div class="latest-content">{latest['content']}</div>
-                        <a href="{latest['filename']}" class="read-more">🔗 查看獨立頁面 →</a>
-                    </div>
-                    
-                    <div
+    index_path = os.path.join(daily_post_dir, "index.html")
+    with open(index_path, "w", encoding="utf-8") as f:
+        f.write(index_html)
+    print(f"📑 已更新 daily-post/index.html (共 {len(articles)} 篇文章)")
