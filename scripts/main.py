@@ -372,62 +372,64 @@ def get_footer_html():
 
 def get_nav_script():
     """返回導覽列載入腳本（使用絕對路徑）"""
-    return """document.addEventListener('DOMContentLoaded', function () {
-      fetch('/nav.html')
-        .then(response => response.text())
-        .then(data => {
-          let fixedData = data.replace(/href="(?!https?:\/\/|\/)([^"]+)"/g, 'href="/$1"');
-          fixedData = fixedData.replace(/href="\/([^"]+)"/g, 'href="/$1"');
-          document.getElementById('nav-placeholder').innerHTML = fixedData;
-          initNav();
-        })
-        .catch(err => {
-          console.error('無法載入導覽列:', err);
-          document.getElementById('nav-placeholder').innerHTML = 
-            '<nav style="background:var(--moss);color:white;padding:0 4vw;height:72px;display:flex;align-items:center;">' +
-            '<span style="font-family:Noto Serif TC,serif;font-weight:900;">🌿 蕨積</span>' +
-            '</nav>';
-        });
+    return """
+document.addEventListener('DOMContentLoaded', function () {
+  fetch('/nav.html')
+    .then(response => response.text())
+    .then(data => {
+      let fixedData = data.replace(/href="(?!https?:\\/\\/|\\/)([^"]+)"/g, 'href="/$1"');
+      fixedData = fixedData.replace(/href="\\/([^"]+)"/g, 'href="/$1"');
+      document.getElementById('nav-placeholder').innerHTML = fixedData;
+      initNav();
+    })
+    .catch(err => {
+      console.error('無法載入導覽列:', err);
+      document.getElementById('nav-placeholder').innerHTML = 
+        '<nav style="background:var(--moss);color:white;padding:0 4vw;height:72px;display:flex;align-items:center;">' +
+        '<span style="font-family:Noto Serif TC,serif;font-weight:900;">🌿 蕨積</span>' +
+        '</nav>';
+    });
 
-      function initNav() {
-        var btn = document.getElementById('hamburger');
-        var menu = document.getElementById('mobileMenu');
-        if (btn && menu) {
-          btn.addEventListener('click', function () {
-            btn.classList.toggle('open');
-            menu.classList.toggle('open');
-          });
-          menu.querySelectorAll('.mobile-link').forEach(function (a) {
-            a.addEventListener('click', function () {
-              btn.classList.remove('open');
-              menu.classList.remove('open');
-            });
-          });
-        }
-        if (menu) {
-          menu.querySelectorAll('.mobile-parent').forEach(function (parent) {
-            parent.addEventListener('click', function () {
-              var id = parent.getAttribute('data-target');
-              var sub = document.getElementById(id);
-              var caretId = 'caret-' + id.replace('sub-', '');
-              var caret = document.getElementById(caretId);
-              var opening = !sub.classList.contains('open');
-              menu.querySelectorAll('.mobile-sub').forEach(function (s) { s.classList.remove('open'); });
-              menu.querySelectorAll('.mobile-caret').forEach(function (c) { c.classList.remove('open'); });
-              if (opening) {
-                sub.classList.add('open');
-                if (caret) caret.classList.add('open');
-              }
-            });
-          });
-        }
-        window.addEventListener('scroll', function () {
-          var nav = document.getElementById('mainNav');
-          if (nav) nav.classList.toggle('scrolled', window.scrollY > 20);
+  function initNav() {
+    var btn = document.getElementById('hamburger');
+    var menu = document.getElementById('mobileMenu');
+    if (btn && menu) {
+      btn.addEventListener('click', function () {
+        btn.classList.toggle('open');
+        menu.classList.toggle('open');
+      });
+      menu.querySelectorAll('.mobile-link').forEach(function (a) {
+        a.addEventListener('click', function () {
+          btn.classList.remove('open');
+          menu.classList.remove('open');
         });
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-      }
-    });"""
+      });
+    }
+    if (menu) {
+      menu.querySelectorAll('.mobile-parent').forEach(function (parent) {
+        parent.addEventListener('click', function () {
+          var id = parent.getAttribute('data-target');
+          var sub = document.getElementById(id);
+          var caretId = 'caret-' + id.replace('sub-', '');
+          var caret = document.getElementById(caretId);
+          var opening = !sub.classList.contains('open');
+          menu.querySelectorAll('.mobile-sub').forEach(function (s) { s.classList.remove('open'); });
+          menu.querySelectorAll('.mobile-caret').forEach(function (c) { c.classList.remove('open'); });
+          if (opening) {
+            sub.classList.add('open');
+            if (caret) caret.classList.add('open');
+          }
+        });
+      });
+    }
+    window.addEventListener('scroll', function () {
+      var nav = document.getElementById('mainNav');
+      if (nav) nav.classList.toggle('scrolled', window.scrollY > 20);
+    });
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+});
+"""
 
 # ==================== 文章生成 ====================
 def generate_article():
@@ -576,14 +578,11 @@ def save_article_as_html(title, content, category, output_dir="articles"):
     print(f"📄 文章已儲存：{filepath}")
     return filepath
 
-# ==================== 索引頁面生成（套用官網模板） ====================
+# ==================== 索引頁面生成 ====================
 def generate_daily_post_index(daily_post_dir):
-    """產生 daily-post 目錄的索引頁面
-    套用官網模板樣式，所有內容放在 <main> 內
-    """
+    """產生 daily-post 目錄的索引頁面"""
     articles = []
     for file in os.listdir(daily_post_dir):
-        # 只處理以日期開頭的 HTML 檔案 (格式: YYYY-MM-DD-*.html)
         if file.endswith(".html") and file != "index.html" and len(file) >= 10 and file[4] == '-' and file[7] == '-':
             filepath = os.path.join(daily_post_dir, file)
             
@@ -618,24 +617,22 @@ def generate_daily_post_index(daily_post_dir):
     articles.sort(key=lambda x: x["date"], reverse=True)
     
     if not articles:
-        # 無文章時的提示
         empty_html = f"""<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>蕨積每日文章 - 生活隨筆</title>
+    <title>蕨積每日文章</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
     <style>{get_template_styles()}</style>
 </head>
 <body>
     <div id="nav-placeholder"></div>
     <main class="content">
-        <div style="text-align: center; padding: 60px 20px;">
-            <h1 style="font-family: 'Noto Serif TC', serif; color: var(--moss);">🌿 蕨積每日文章</h1>
-            <p style="color: var(--stone); margin-top: 1rem;">📭 目前還沒有文章，等待機器人發文中...</p>
+        <div style="text-align:center;padding:60px 20px;">
+            <h1 style="font-family:'Noto Serif TC',serif;color:var(--moss);">🌿 蕨積每日文章</h1>
+            <p style="color:var(--stone);margin-top:1rem;">📭 目前還沒有文章，等待機器人發文中...</p>
         </div>
     </main>
     {get_footer_html()}
@@ -657,6 +654,37 @@ def generate_daily_post_index(daily_post_dir):
         if month_key not in archive_by_month:
             archive_by_month[month_key] = []
         archive_by_month[month_key].append(article)
+    
+    # 生成過往文章列表 HTML
+    past_list_html = ""
+    for article in past_articles[:30]:
+        cat_color = CATEGORY_COLORS.get(article["category"], "#6c757d")
+        past_list_html += f"""
+                        <li class="past-item" data-category="{article['category']}">
+                            <span class="past-badge" style="background: {cat_color};">{article['category']}</span>
+                            <a class="past-link" href="{article['filename']}">{article['title']}</a>
+                            <div class="past-meta">📅 {article['date']}</div>
+                        </li>"""
+    
+    # 生成歸檔 HTML
+    archive_html = ""
+    sorted_months = sorted(archive_by_month.keys(), reverse=True)
+    for month in sorted_months:
+        month_display = f"{month[:4]}年{int(month[5:7])}月"
+        archive_html += f"""
+                    <div class="archive-month">
+                        <div class="archive-month-title">{month_display}</div>
+                        <ul class="archive-list">"""
+        for article in archive_by_month[month][:8]:
+            archive_html += f'<li><a href="{article["filename"]}">{article["title"][:25]}{"..." if len(article["title"]) > 25 else ""}</a></li>'
+        if len(archive_by_month[month]) > 8:
+            archive_html += f'<li><a href="#" style="color:#aaa;">... 共{len(archive_by_month[month])}篇</a></li>'
+        archive_html += """
+                        </ul>
+                    </div>"""
+    
+    # 最新文章類別顏色
+    latest_cat_color = CATEGORY_COLORS.get(latest['category'], "#6c757d")
     
     # 生成完整 HTML
     index_html = f"""<!DOCTYPE html>
@@ -695,10 +723,6 @@ def generate_daily_post_index(daily_post_dir):
     }}
     .category-btn:hover {{ transform: translateY(-2px); }}
     .category-btn.active {{ background: #4a7c59; color: white; }}
-    .category-植物.active {{ background: #4a7c59; }}
-    .category-永續.active {{ background: #2c7a4d; }}
-    .category-碳盤查.active {{ background: #1e6f5c; }}
-    .category-生活.active {{ background: #b88b4a; }}
     
     .two-columns {{ display: flex; gap: 2rem; flex-wrap: wrap; }}
     .main-col {{ flex: 3; min-width: 250px; }}
@@ -713,7 +737,7 @@ def generate_daily_post_index(daily_post_dir):
     }}
     .latest-category {{
         display: inline-block;
-        background: {CATEGORY_COLORS.get(latest['category'], '#6c757d')};
+        background: {latest_cat_color};
         color: white;
         padding: 0.2rem 0.8rem;
         border-radius: 20px;
@@ -758,10 +782,10 @@ def generate_daily_post_index(daily_post_dir):
             
             <div class="categories">
                 <button class="category-btn active" data-category="all">📋 全部</button>
-                <button class="category-btn category-植物" data-category="植物">🌿 植物</button>
-                <button class="category-btn category-永續" data-category="永續">♻️ 永續</button>
-                <button class="category-btn category-碳盤查" data-category="碳盤查">📊 碳盤查</button>
-                <button class="category-btn category-生活" data-category="生活">🏡 生活</button>
+                <button class="category-btn" data-category="植物">🌿 植物</button>
+                <button class="category-btn" data-category="永續">♻️ 永續</button>
+                <button class="category-btn" data-category="碳盤查">📊 碳盤查</button>
+                <button class="category-btn" data-category="生活">🏡 生活</button>
             </div>
             
             <div class="two-columns">
@@ -774,176 +798,4 @@ def generate_daily_post_index(daily_post_dir):
                         <a href="{latest['filename']}" class="read-more">🔗 查看獨立頁面 →</a>
                     </div>
                     
-                    <div class="section-title">📖 過往文章</div>
-                    <ul class="past-list" id="pastList">"""
-    
-    for article in past_articles[:30]:
-        cat_color = CATEGORY_COLORS.get(article["category"], "#6c757d")
-        index_html += f"""
-                        <li class="past-item" data-category="{article['category']}">
-                            <span class="past-badge" style="background: {cat_color};">{article['category']}</span>
-                            <a class="past-link" href="{article['filename']}">{article['title']}</a>
-                            <div class="past-meta">📅 {article['date']}</div>
-                        </li>"""
-    
-    index_html += """
-                    </ul>
-                </div>
-                
-                <div class="sidebar-col">
-                    <div class="section-title">📚 歷史歸檔</div>"""
-    
-    sorted_months = sorted(archive_by_month.keys(), reverse=True)
-    for month in sorted_months:
-        month_display = f"{month[:4]}年{int(month[5:7])}月"
-        index_html += f"""
-                    <div class="archive-month">
-                        <div class="archive-month-title">{month_display}</div>
-                        <ul class="archive-list">"""
-        for article in archive_by_month[month][:8]:
-            index_html += f'<li><a href="{article["filename"]}">{article["title"][:25]}{"..." if len(article["title"]) > 25 else ""}</a></li>'
-        if len(archive_by_month[month]) > 8:
-            index_html += f'<li><a href="#" style="color:#aaa;">... 共{len(archive_by_month[month])}篇</a></li>'
-        index_html += """
-                        </ul>
-                    </div>"""
-    
-    index_html += f"""
-                </div>
-            </div>
-        </div>
-    </main>
-    
-    {get_footer_html()}
-    
-    <script>{get_nav_script()}
-    // 分類篩選功能
-    const filterBtns = document.querySelectorAll('.category-btn');
-    const pastItems = document.querySelectorAll('#pastList .past-item');
-    
-    filterBtns.forEach(btn => {{
-        btn.addEventListener('click', () => {{
-            const category = btn.dataset.category;
-            filterBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            
-            pastItems.forEach(item => {{
-                if (category === 'all' || item.dataset.category === category) {{
-                    item.style.display = '';
-                }} else {{
-                    item.style.display = 'none';
-                }}
-            }});
-        }});
-    }});
-    </script>
-</body>
-</html>"""
-    
-    index_path = os.path.join(daily_post_dir, "index.html")
-    with open(index_path, "w", encoding="utf-8") as f:
-        f.write(index_html)
-    print(f"📑 已更新 daily-post/index.html (共 {len(articles)} 篇文章)")
-
-# ==================== 推送到網站倉庫 ====================
-def commit_and_push_to_website():
-    """將文章推送到網站倉庫的 daily-post 目錄"""
-    print("=" * 50)
-    print("開始推送到網站倉庫...")
-    
-    username = os.getenv("GITHUB_USERNAME", "isa930323-jpg")
-    token = os.getenv("GH_TOKEN")
-    repo_name = os.getenv("WEBSITE_REPO_NAME", "fb")
-    
-    print(f"📌 用戶名: {username}")
-    print(f"📌 倉庫名: {repo_name}")
-    print(f"📌 Token 是否存在: {'是' if token else '否'}")
-    
-    if not token:
-        print("❌ 錯誤：GH_TOKEN 環境變數未設定")
-        return
-    
-    website_repo = f"https://{username}:{token}@github.com/{username}/{repo_name}.git"
-    print(f"🔗 目標倉庫: https://github.com/{username}/{repo_name}")
-    
-    with tempfile.TemporaryDirectory() as tmpdir:
-        print(f"📁 臨時目錄: {tmpdir}")
-        
-        print("📥 正在 clone 網站倉庫...")
-        clone_result = subprocess.run(
-            ["git", "clone", website_repo, "website"],
-            cwd=tmpdir,
-            capture_output=True,
-            text=True
-        )
-        
-        if clone_result.returncode != 0:
-            print(f"❌ Clone 失敗: {clone_result.stderr}")
-            return
-        
-        print("✅ Clone 成功")
-        website_dir = os.path.join(tmpdir, "website")
-        
-        daily_post_dir = os.path.join(website_dir, "daily-post")
-        os.makedirs(daily_post_dir, exist_ok=True)
-        print(f"📁 daily-post 目錄: {daily_post_dir}")
-        
-        article_copied = False
-        if os.path.exists("articles"):
-            for file in os.listdir("articles"):
-                if file.endswith(".html"):
-                    src = os.path.join("articles", file)
-                    dst = os.path.join(daily_post_dir, file)
-                    shutil.copy2(src, dst)
-                    print(f"📄 複製文章: {file}")
-                    article_copied = True
-        
-        if not article_copied:
-            print("⚠️ 沒有找到文章檔案")
-            return
-        
-        images_dir = os.path.join(daily_post_dir, "images")
-        os.makedirs(images_dir, exist_ok=True)
-        if os.path.exists("images"):
-            for file in os.listdir("images"):
-                shutil.copy2(os.path.join("images", file), os.path.join(images_dir, file))
-                print(f"🖼️ 複製圖片: {file}")
-        
-        generate_daily_post_index(daily_post_dir)
-        
-        print("📤 提交並推送到 GitHub...")
-        subprocess.run(["git", "config", "user.name", "jueji-bot"], cwd=website_dir, check=False)
-        subprocess.run(["git", "config", "user.email", "bot@jueji.com"], cwd=website_dir, check=False)
-        subprocess.run(["git", "add", "daily-post/"], cwd=website_dir, check=True)
-        
-        status = subprocess.run(["git", "status", "--porcelain"], cwd=website_dir, capture_output=True, text=True)
-        
-        if status.stdout.strip():
-            commit_msg = f"每日發文 {datetime.now().strftime('%Y-%m-%d')}"
-            subprocess.run(["git", "commit", "-m", commit_msg], cwd=website_dir, check=False)
-            push_result = subprocess.run(["git", "push", "origin", "main"], cwd=website_dir, capture_output=True, text=True)
-            if push_result.returncode == 0:
-                print("✅ 成功推送到網站倉庫")
-            else:
-                print(f"❌ 推送失敗: {push_result.stderr}")
-        else:
-            print("📭 沒有新的變更需要推送")
-
-# ==================== 主程式 ====================
-def main():
-    print("=" * 50)
-    print("🌿 蕨積每日發文機器人啟動")
-    print(f"執行時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    
-    title, content, category = generate_article()
-    if not title or not content:
-        print("❌ 文章生成失敗，結束程式")
-        sys.exit(1)
-    
-    save_article_as_html(title, content, category)
-    commit_and_push_to_website()
-    
-    print("🎉 每日發文流程完成")
-
-if __name__ == "__main__":
-    main()
+                    <div
