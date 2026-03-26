@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
 每日自動發文機器人
-- 使用 DeepSeek API 生成文章
+- 使用 DeepSeek API 生成文章（四大類別輪換：植物、永續、碳盤查、生活）
 - 將文章保存為 HTML
 - 推送到網站倉庫的 daily-post 目錄
+- 自動生成含類別分類的索引頁面
 """
 
 import os
@@ -19,41 +20,109 @@ import requests
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
-# 文章生成提示詞
-PROMPT_TEMPLATE = """請寫一篇關於「蕨類植物」的科普文章，主題可以圍繞：
-- 蕨類植物的生態特徵
-- 蕨類的繁殖方式
-- 常見蕨類品種介紹
-- 蕨類在園藝中的應用
+# 四大類別
+CATEGORIES = ["植物", "永續", "碳盤查", "生活"]
+
+# 類別對應的顏色（用於頁面顯示）
+CATEGORY_COLORS = {
+    "植物": "#4a7c59",
+    "永續": "#2c7a4d",
+    "碳盤查": "#1e6f5c",
+    "生活": "#b88b4a"
+}
+
+# 各類別的提示詞模板
+PROMPT_TEMPLATES = {
+    "植物": """請寫一篇關於「植物」的科普或生活文章，主題可以圍繞：
+- 植物的生態特徵與魅力
+- 室內植物養護技巧
+- 特殊植物品種介紹
+- 植物與身心靈健康
+
+要求：
+1. 標題要吸引人
+2. 內容約 500-800 字
+3. 語言使用繁體中文
+4. 結尾加上「🌿 蕨積 - 讓生活多一點綠」""",
+
+    "永續": """請寫一篇關於「永續發展」或「環境永續」的文章，主題可以圍繞：
+- 日常生活中的永續實踐
+- 減塑與零浪費生活
+- 永續消費與循環經濟
+- 企業永續案例或趨勢
+
+要求：
+1. 標題要吸引人
+2. 內容約 500-800 字
+3. 語言使用繁體中文
+4. 結尾加上「🌿 蕨積 - 讓生活多一點綠」""",
+
+    "碳盤查": """請寫一篇關於「碳盤查」或「碳管理」的科普文章，主題可以圍繞：
+- 碳盤查的基本概念與方法
+- 企業為何需要碳盤查
+- 個人碳足跡計算與減碳
+- 碳中和與淨零排放趨勢
+
+要求：
+1. 標題要吸引人
+2. 內容約 500-800 字
+3. 語言使用繁體中文
+4. 結尾加上「🌿 蕨積 - 讓生活多一點綠」""",
+
+    "生活": """請寫一篇關於「生活風格」或「質感生活」的文章，主題可以圍繞：
+- 慢生活與正念練習
+- 居家佈置與收納美學
+- 簡單生活與斷捨離
+- 生活儀式感與幸福感
 
 要求：
 1. 標題要吸引人
 2. 內容約 500-800 字
 3. 語言使用繁體中文
 4. 結尾加上「🌿 蕨積 - 讓生活多一點綠」"""
+}
+
+# 各類別的 System Prompt
+SYSTEM_PROMPTS = {
+    "植物": "你是一位植物學科普作家，擅長撰寫有趣且專業的植物文章。",
+    "永續": "你是一位環境永續專家，擅長用淺顯易懂的方式講解永續議題。",
+    "碳盤查": "你是一位碳管理顧問，擅長解釋碳盤查與氣候變遷相關知識。",
+    "生活": "你是一位生活風格作家，擅長分享質感生活與心靈成長的內容。"
+}
+
+def get_today_category():
+    """根據日期決定今天的主題類別（四個類別輪換）"""
+    day_of_year = datetime.now().timetuple().tm_yday
+    category_index = (day_of_year - 1) % len(CATEGORIES)
+    return CATEGORIES[category_index]
 
 # ==================== 文章生成 ====================
 def generate_article():
     """调用 DeepSeek API 生成文章内容"""
     if not DEEPSEEK_API_KEY:
         print("❌ 錯誤：DEEPSEEK_API_KEY 環境變數未設定")
-        return None, None
-
+        return None, None, None
+    
+    category = get_today_category()
+    prompt = PROMPT_TEMPLATES[category]
+    
+    print(f"📌 今日主題類別：{category}")
+    
     headers = {
         "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
         "Content-Type": "application/json"
     }
-
+    
     payload = {
         "model": "deepseek-chat",
         "messages": [
-            {"role": "system", "content": "你是一位植物學科普作家，擅長撰寫有趣且專業的植物文章。"},
-            {"role": "user", "content": PROMPT_TEMPLATE}
+            {"role": "system", "content": SYSTEM_PROMPTS[category]},
+            {"role": "user", "content": prompt}
         ],
         "temperature": 0.7,
         "max_tokens": 1500
     }
-
+    
     print("🤖 正在呼叫 DeepSeek API 生成文章...")
     try:
         response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=60)
@@ -61,27 +130,28 @@ def generate_article():
         data = response.json()
         content = data["choices"][0]["message"]["content"]
         
-        # 提取標題（假設第一行是標題）
         lines = content.strip().split("\n")
         title = lines[0].replace("#", "").strip()
         if not title:
-            title = f"蕨類植物日誌 {datetime.now().strftime('%Y-%m-%d')}"
+            title = f"{category}日誌 {datetime.now().strftime('%Y-%m-%d')}"
         
         print(f"✅ 文章生成成功：{title}")
-        return title, content
+        print(f"📂 類別：{category}")
+        return title, content, category
     except Exception as e:
         print(f"❌ API 呼叫失敗：{e}")
-        return None, None
+        return None, None, None
 
-def save_article_as_html(title, content, output_dir="articles"):
+def save_article_as_html(title, content, category, output_dir="articles"):
     """將文章儲存為 HTML 檔案"""
     os.makedirs(output_dir, exist_ok=True)
     
-    # 檔案名稱：日期-標題簡化版
     date_str = datetime.now().strftime("%Y-%m-%d")
-    safe_title = title.replace(" ", "-").replace("/", "-")[:30]
+    safe_title = title.replace(" ", "-").replace("/", "-").replace("?", "").replace("！", "")[:50]
     filename = f"{date_str}-{safe_title}.html"
     filepath = os.path.join(output_dir, filename)
+    
+    category_color = CATEGORY_COLORS.get(category, "#4a7c59")
     
     html_content = f"""<!DOCTYPE html>
 <html lang="zh-TW">
@@ -90,22 +160,41 @@ def save_article_as_html(title, content, output_dir="articles"):
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title} - 蕨積每日文章</title>
     <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
             line-height: 1.8;
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
             padding: 2rem;
             background: #faf8f4;
             color: #2c3e2f;
         }}
-        h1 {{ color: #2c5e2e; border-left: 4px solid #6b8c5c; padding-left: 1rem; }}
+        .category-tag {{
+            display: inline-block;
+            background: {category_color};
+            color: white;
+            padding: 0.2rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin-bottom: 1rem;
+        }}
+        h1 {{ color: #2c5e2e; border-left: 4px solid #6b8c5c; padding-left: 1rem; margin: 1rem 0; }}
         .date {{ color: #7f8c6d; margin-bottom: 2rem; }}
+        .content {{ margin: 2rem 0; }}
+        .content p {{ margin: 1rem 0; }}
         hr {{ margin: 2rem 0; border: none; border-top: 1px solid #e0d6cc; }}
         .footer {{ text-align: center; margin-top: 3rem; color: #7f8c6d; font-size: 0.9rem; }}
+        .back-link {{
+            display: inline-block;
+            margin-top: 1rem;
+            color: #4a7c59;
+            text-decoration: none;
+        }}
     </style>
 </head>
 <body>
+    <div class="category-tag">📌 {category}</div>
     <h1>{title}</h1>
     <div class="date">📅 {datetime.now().strftime("%Y年%m月%d日")}</div>
     <div class="content">
@@ -114,8 +203,9 @@ def save_article_as_html(title, content, output_dir="articles"):
     <hr>
     <div class="footer">
         🌿 蕨積 - 讓生活多一點綠<br>
-        每日一篇，與蕨類一起呼吸
+        每日一篇，與你一起成長
     </div>
+    <a href="index.html" class="back-link">← 返回文章列表</a>
 </body>
 </html>"""
     
@@ -125,85 +215,286 @@ def save_article_as_html(title, content, output_dir="articles"):
     print(f"📄 文章已儲存：{filepath}")
     return filepath
 
-# ==================== 推送到網站倉庫 ====================
+# ==================== 索引頁面生成 ====================
 def generate_daily_post_index(daily_post_dir):
-    """產生 daily-post 目錄的索引頁面"""
+    """產生 daily-post 目錄的索引頁面（含類別篩選、最新文章、側邊欄）"""
     articles = []
     for file in os.listdir(daily_post_dir):
         if file.endswith(".html") and file != "index.html":
-            articles.append(file)
+            # 嘗試從檔案內容讀取類別
+            filepath = os.path.join(daily_post_dir, file)
+            category = "未分類"
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    import re
+                    match = re.search(r'<div class="category-tag">📌 (.+?)</div>', content)
+                    if match:
+                        category = match.group(1)
+            except:
+                pass
+            
+            # 解析日期（從檔名）
+            date_str = file[:10] if len(file) >= 10 else "0000-00-00"
+            title = file.replace(".html", "").replace(date_str + "-", "").replace("-", " / ")
+            
+            articles.append({
+                "filename": file,
+                "date": date_str,
+                "title": title,
+                "category": category
+            })
     
-    articles.sort(reverse=True)  # 最新的在前
+    articles.sort(key=lambda x: x["date"], reverse=True)
     
     if not articles:
         return
     
-    # 改用普通字符串拼接，避免 f-string 中的反斜杠問題
-    index_content = """<!DOCTYPE html>
+    # 按類別分組
+    articles_by_category = {cat: [] for cat in CATEGORIES}
+    articles_by_category["未分類"] = []
+    for article in articles:
+        cat = article["category"] if article["category"] in CATEGORIES else "未分類"
+        articles_by_category[cat].append(article)
+    
+    # 最新5篇文章
+    latest_articles = articles[:5]
+    
+    # 生成側邊欄 HTML（過往文章按日期歸檔）
+    archive_by_month = {}
+    for article in articles:
+        month_key = article["date"][:7]  # YYYY-MM
+        if month_key not in archive_by_month:
+            archive_by_month[month_key] = []
+        archive_by_month[month_key].append(article)
+    
+    # 生成 HTML
+    index_content = f"""<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>蕨積每日文章</title>
+    <title>蕨積每日文章 - 植物・永續・碳盤查・生活</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-            line-height: 1.6;
-            color: #2c3e2f;
             background-color: #faf8f4;
+            color: #2c3e2f;
+        }}
+        .container {{
+            max-width: 1200px;
+            margin: 0 auto;
             padding: 2rem;
-        }
-        .container { max-width: 800px; margin: 0 auto; }
-        h1 { color: #2c5e2e; margin-bottom: 2rem; font-size: 2rem; }
-        .article-list { list-style: none; padding: 0; }
-        .article-item {
-            margin: 1rem 0;
-            padding: 1.2rem;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .article-item:hover {
+        }}
+        /* 標題區 */
+        .header {{
+            text-align: center;
+            margin-bottom: 2rem;
+        }}
+        .header h1 {{
+            color: #2c5e2e;
+            font-size: 2rem;
+        }}
+        .header p {{
+            color: #7f8c6d;
+            margin-top: 0.5rem;
+        }}
+        /* 四大類別連結 */
+        .categories {{
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }}
+        .category-btn {{
+            padding: 0.5rem 1.5rem;
+            border-radius: 30px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: transform 0.2s;
+        }}
+        .category-btn:hover {{
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-        .article-link {
+        }}
+        .category-植物 {{ background: #4a7c59; color: white; }}
+        .category-永續 {{ background: #2c7a4d; color: white; }}
+        .category-碳盤查 {{ background: #1e6f5c; color: white; }}
+        .category-生活 {{ background: #b88b4a; color: white; }}
+        .category-all {{ background: #6c757d; color: white; }}
+        
+        /* 兩欄布局 */
+        .main-layout {{
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }}
+        .content-area {{
+            flex: 3;
+            min-width: 250px;
+        }}
+        .sidebar {{
+            flex: 1;
+            min-width: 200px;
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            height: fit-content;
+        }}
+        .section-title {{
             font-size: 1.2rem;
+            color: #2c5e2e;
+            border-bottom: 2px solid #e0d6cc;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }}
+        .article-list {{
+            list-style: none;
+            padding: 0;
+        }}
+        .article-item {{
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #f0e8e0;
+        }}
+        .article-link {{
+            font-size: 1rem;
             font-weight: 500;
             color: #4a7c59;
             text-decoration: none;
-        }
-        .article-link:hover { text-decoration: underline; }
-        .article-date {
+            display: block;
+        }}
+        .article-link:hover {{
+            text-decoration: underline;
+        }}
+        .article-meta {{
+            font-size: 0.75rem;
+            color: #aaa;
+            margin-top: 0.25rem;
+        }}
+        .category-badge {{
+            display: inline-block;
+            font-size: 0.7rem;
+            padding: 0.1rem 0.5rem;
+            border-radius: 12px;
+            color: white;
+            margin-right: 0.5rem;
+        }}
+        .archive-month {{
+            margin-bottom: 1rem;
+        }}
+        .archive-month-title {{
+            font-weight: 600;
+            color: #4a7c59;
+            margin-bottom: 0.5rem;
+        }}
+        .archive-list {{
+            list-style: none;
+            padding-left: 0.5rem;
+        }}
+        .archive-list li {{
+            margin-bottom: 0.3rem;
+        }}
+        .archive-list a {{
             color: #7f8c6d;
+            text-decoration: none;
             font-size: 0.85rem;
-            margin-top: 0.5rem;
-        }
-        .back-link {
+        }}
+        .archive-list a:hover {{
+            color: #4a7c59;
+            text-decoration: underline;
+        }}
+        .back-link {{
             display: inline-block;
             margin-top: 2rem;
             color: #4a7c59;
             text-decoration: none;
-        }
+        }}
+        @media (max-width: 768px) {{
+            .main-layout {{
+                flex-direction: column;
+            }}
+        }}
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🌿 蕨積每日文章</h1>
-        <ul class="article-list">"""
+        <div class="header">
+            <h1>🌿 蕨積每日文章</h1>
+            <p>植物・永續・碳盤查・生活 — 每天一篇，與你一起成長</p>
+        </div>
+        
+        <div class="categories">
+            <a href="#" class="category-btn category-all" onclick="filterArticles('all')">📋 全部</a>
+"""
     
-    # 手動添加文章列表（避免 f-string 中的反斜杠）
-    for article in articles:
-        display_title = article.replace(".html", "").replace("-", " / ")
-        date_part = article.replace(".html", "").split("-")[-1] if "-" in article else "最新"
-        index_content += f'<li class="article-item"><a class="article-link" href="{article}">{display_title}</a><div class="article-date">📅 {date_part}</div></li>'
+    for cat in CATEGORIES:
+        color_class = f"category-{cat}"
+        index_content += f'            <a href="#" class="category-btn {color_class}" onclick="filterArticles(\'{cat}\')">📌 {cat}</a>\n'
+    
+    index_content += """        </div>
+        
+        <div class="main-layout">
+            <div class="content-area">
+                <div class="section-title">📖 最新文章</div>
+                <ul class="article-list" id="article-list">
+"""
+    
+    # 最新文章列表（全部顯示）
+    for article in latest_articles:
+        cat_color = CATEGORY_COLORS.get(article["category"], "#6c757d")
+        index_content += f"""
+                    <li class="article-item" data-category="{article['category']}">
+                        <span class="category-badge" style="background: {cat_color};">{article['category']}</span>
+                        <a class="article-link" href="{article['filename']}">{article['title']}</a>
+                        <div class="article-meta">📅 {article['date']}</div>
+                    </li>"""
     
     index_content += """
-        </ul>
+                </ul>
+            </div>
+            
+            <div class="sidebar">
+                <div class="section-title">📚 過往文章</div>
+"""
+    
+    # 過往文章（按月歸檔）
+    sorted_months = sorted(archive_by_month.keys(), reverse=True)
+    for month in sorted_months:
+        month_display = f"{month[:4]}年{int(month[5:7])}月"
+        index_content += f"""
+                <div class="archive-month">
+                    <div class="archive-month-title">{month_display}</div>
+                    <ul class="archive-list">"""
+        for article in archive_by_month[month][:10]:  # 每個月最多顯示10篇
+            index_content += f'<li><a href="{article["filename"]}">{article["title"][:30]}{"..." if len(article["title"]) > 30 else ""}</a></li>'
+        if len(archive_by_month[month]) > 10:
+            index_content += f'<li><a href="#" style="color:#aaa;">... 共{len(archive_by_month[month])}篇</a></li>'
+        index_content += """
+                    </ul>
+                </div>"""
+    
+    index_content += """
+            </div>
+        </div>
+        
         <a href="/" class="back-link">← 返回首頁</a>
     </div>
+    
+    <script>
+        function filterArticles(category) {
+            const items = document.querySelectorAll('#article-list .article-item');
+            items.forEach(item => {
+                if (category === 'all' || item.dataset.category === category) {
+                    item.style.display = '';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+    </script>
 </body>
 </html>"""
     
@@ -212,6 +503,7 @@ def generate_daily_post_index(daily_post_dir):
         f.write(index_content)
     print("📑 已更新 daily-post/index.html")
 
+# ==================== 推送到網站倉庫 ====================
 def commit_and_push_to_website():
     """將文章推送到網站倉庫的 daily-post 目錄"""
     print("=" * 50)
@@ -229,14 +521,12 @@ def commit_and_push_to_website():
         print("❌ 錯誤：GH_TOKEN 環境變數未設定")
         return
     
-    # 使用包含 Token 的 URL
     website_repo = f"https://{username}:{token}@github.com/{username}/{repo_name}.git"
     print(f"🔗 目標倉庫: https://github.com/{username}/{repo_name}")
     
     with tempfile.TemporaryDirectory() as tmpdir:
         print(f"📁 臨時目錄: {tmpdir}")
         
-        # 1. Clone 網站倉庫
         print("📥 正在 clone 網站倉庫...")
         clone_result = subprocess.run(
             ["git", "clone", website_repo, "website"],
@@ -247,21 +537,16 @@ def commit_and_push_to_website():
         
         if clone_result.returncode != 0:
             print(f"❌ Clone 失敗: {clone_result.stderr}")
-            print("請檢查：")
-            print("  1. GH_TOKEN 是否正確")
-            print("  2. Token 是否有 repo 權限")
-            print("  3. 倉庫名稱是否正確")
             return
         
         print("✅ Clone 成功")
         website_dir = os.path.join(tmpdir, "website")
         
-        # 2. 確保 daily-post 目錄存在
         daily_post_dir = os.path.join(website_dir, "daily-post")
         os.makedirs(daily_post_dir, exist_ok=True)
         print(f"📁 daily-post 目錄: {daily_post_dir}")
         
-        # 3. 複製新產生的文章
+        # 複製新文章
         article_copied = False
         if os.path.exists("articles"):
             for file in os.listdir("articles"):
@@ -273,10 +558,10 @@ def commit_and_push_to_website():
                     article_copied = True
         
         if not article_copied:
-            print("⚠️ 沒有找到文章檔案，請檢查文章生成步驟")
+            print("⚠️ 沒有找到文章檔案")
             return
         
-        # 4. 複製圖片（如果有）
+        # 複製圖片（如果有）
         images_dir = os.path.join(daily_post_dir, "images")
         os.makedirs(images_dir, exist_ok=True)
         if os.path.exists("images"):
@@ -286,10 +571,10 @@ def commit_and_push_to_website():
                 shutil.copy2(src, dst)
                 print(f"🖼️ 複製圖片: {file}")
         
-        # 5. 產生索引頁面
+        # 產生索引頁面（包含類別篩選、最新文章、過往文章側邊欄）
         generate_daily_post_index(daily_post_dir)
         
-        # 6. 提交並推送
+        # 提交並推送
         print("📤 提交並推送到 GitHub...")
         subprocess.run(["git", "config", "user.name", "jueji-bot"], cwd=website_dir, check=False)
         subprocess.run(["git", "config", "user.email", "bot@jueji.com"], cwd=website_dir, check=False)
@@ -325,20 +610,15 @@ def main():
     print("🌿 蕨積每日發文機器人啟動")
     print(f"執行時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
-    # 1. 生成文章
-    title, content = generate_article()
+    title, content, category = generate_article()
     if not title or not content:
         print("❌ 文章生成失敗，結束程式")
         sys.exit(1)
     
-    # 2. 儲存文章
-    save_article_as_html(title, content)
-    
-    # 3. 推送到網站倉庫
+    save_article_as_html(title, content, category)
     commit_and_push_to_website()
     
     print("🎉 每日發文流程完成")
 
-# ==================== 程式入口 ====================
 if __name__ == "__main__":
     main()
