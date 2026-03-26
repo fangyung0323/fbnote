@@ -29,13 +29,15 @@ jobs:
       - name: 调试 - 测试 Git 权限
         run: |
           git ls-remote https://${{ secrets.TARGET_USERNAME }}:${{ secrets.GH_TOKEN }}@github.com/${{ secrets.TARGET_USERNAME }}/${{ secrets.TARGET_REPO_NAME }}.git
+      
       - name: 测试脚本语法
-  run: |
-    echo "=== 语法检查 ==="
-    python -m py_compile scripts/main.py
-    echo "=== 语法检查通过 ==="
-    echo "=== 测试导入 ==="
-    python -c "import sys; sys.path.insert(0, 'scripts'); import main; print('导入成功')"
+        run: |
+          echo "=== 语法检查 ==="
+          python -m py_compile scripts/main.py
+          echo "=== 语法检查通过 ==="
+          echo "=== 测试导入 ==="
+          python -c "import sys; sys.path.insert(0, 'scripts'); import main; print('导入成功')"
+      
       - name: 执行文件机器人
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
