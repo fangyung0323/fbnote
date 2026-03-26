@@ -4,7 +4,7 @@
 - 使用 DeepSeek API 生成文章（四大類別輪換：植物、永續、碳盤查、生活）
 - 將文章保存為 HTML
 - 推送到網站倉庫的 daily-post 目錄
-- 自動生成含類別篩選、最新文章完整顯示、過往文章歸檔的索引頁面
+- 自動生成索引頁面
 """
 
 import os
@@ -154,7 +154,7 @@ def save_article_as_html(title, content, category, output_dir="articles"):
     
     category_color = CATEGORY_COLORS.get(category, "#4a7c59")
     
-    # 將換行轉換為 <br>，同時保留段落結構
+    # 將換行轉換為 <br>
     content_html = content.replace(chr(10), "<br>")
     
     html_content = f"""<!DOCTYPE html>
@@ -186,7 +186,6 @@ def save_article_as_html(title, content, category, output_dir="articles"):
         h1 {{ color: #2c5e2e; border-left: 4px solid #6b8c5c; padding-left: 1rem; margin: 1rem 0; }}
         .date {{ color: #7f8c6d; margin-bottom: 2rem; }}
         .content {{ margin: 2rem 0; }}
-        .content p {{ margin: 1rem 0; }}
         hr {{ margin: 2rem 0; border: none; border-top: 1px solid #e0d6cc; }}
         .footer {{ text-align: center; margin-top: 3rem; color: #7f8c6d; font-size: 0.9rem; }}
         .back-link {{
@@ -219,20 +218,16 @@ def save_article_as_html(title, content, category, output_dir="articles"):
     print(f"📄 文章已儲存：{filepath}")
     return filepath
 
-# ==================== 索引頁面生成 ====================
+# ==================== 索引頁面生成（簡化穩定版） ====================
 def generate_daily_post_index(daily_post_dir):
-    """產生 daily-post 目錄的索引頁面
-    上方四大類別連結，中間顯示最新一篇完整文章，右邊顯示過往文章連結
-    """
+    """產生 daily-post 目錄的索引頁面（簡化版，確保穩定）"""
     articles = []
     for file in os.listdir(daily_post_dir):
         if file.endswith(".html") and file != "index.html":
             filepath = os.path.join(daily_post_dir, file)
             
-            # 從檔案內容讀取類別和文章內容
             category = "未分類"
             title = ""
-            content_html = ""
             date_str = file[:10] if len(file) >= 10 else "0000-00-00"
             
             try:
@@ -248,328 +243,65 @@ def generate_daily_post_index(daily_post_dir):
                     match_title = re.search(r'<h1>(.+?)</h1>', full_content)
                     if match_title:
                         title = match_title.group(1)
-                    
-                    # 提取文章主體內容
-                    match_content = re.search(r'<div class="content">(.*?)</div>', full_content, re.DOTALL)
-                    if match_content:
-                        content_html = match_content.group(1)
-            except:
-                pass
+                    else:
+                        title = file.replace(".html", "").replace(date_str + "-", "").replace("-", " / ")
+            except Exception as e:
+                print(f"⚠️ 讀取檔案失敗 {file}: {e}")
+                title = file.replace(".html", "").replace("-", " / ")
             
             articles.append({
                 "filename": file,
                 "date": date_str,
                 "title": title,
-                "category": category,
-                "content": content_html
+                "category": category
             })
     
     articles.sort(key=lambda x: x["date"], reverse=True)
     
     if not articles:
+        print("⚠️ 沒有找到文章")
         return
     
-    # 最新一篇文章
-    latest = articles[0]
-    
-    # 其餘文章（過往文章）
-    past_articles = articles[1:]
-    
-    # 按年月歸檔過往文章
-    archive_by_month = {}
-    for article in past_articles:
-        month_key = article["date"][:7]  # YYYY-MM
-        if month_key not in archive_by_month:
-            archive_by_month[month_key] = []
-        archive_by_month[month_key].append(article)
-    
-    # 生成 HTML
-    index_content = f"""<!DOCTYPE html>
+    # 生成簡潔的 HTML
+    index_content = """<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>蕨積每日文章 - 植物・永續・碳盤查・生活</title>
+    <title>蕨積每日文章</title>
     <style>
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-            background-color: #faf8f4;
-            color: #2c3e2f;
-        }}
-        .container {{
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem;
-        }}
-        /* 標題區 */
-        .header {{
-            text-align: center;
-            margin-bottom: 2rem;
-        }}
-        .header h1 {{
-            color: #2c5e2e;
-            font-size: 2rem;
-        }}
-        .header p {{
-            color: #7f8c6d;
-            margin-top: 0.5rem;
-        }}
-        /* 四大類別連結 */
-        .categories {{
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-            margin-bottom: 2rem;
-            flex-wrap: wrap;
-        }}
-        .category-btn {{
-            padding: 0.5rem 1.5rem;
-            border-radius: 30px;
-            text-decoration: none;
-            font-weight: 500;
-            transition: transform 0.2s;
-            cursor: pointer;
-            border: none;
-            font-size: 0.9rem;
-        }}
-        .category-btn:hover {{
-            transform: translateY(-2px);
-        }}
-        .category-植物 {{ background: #4a7c59; color: white; }}
-        .category-永續 {{ background: #2c7a4d; color: white; }}
-        .category-碳盤查 {{ background: #1e6f5c; color: white; }}
-        .category-生活 {{ background: #b88b4a; color: white; }}
-        .category-all {{ background: #6c757d; color: white; }}
-        
-        /* 兩欄布局 */
-        .main-layout {{
-            display: flex;
-            gap: 2rem;
-            flex-wrap: wrap;
-        }}
-        .content-area {{
-            flex: 3;
-            min-width: 250px;
-        }}
-        .sidebar {{
-            flex: 1;
-            min-width: 200px;
-            background: white;
-            border-radius: 16px;
-            padding: 1.5rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            height: fit-content;
-        }}
-        .section-title {{
-            font-size: 1.2rem;
-            color: #2c5e2e;
-            border-bottom: 2px solid #e0d6cc;
-            padding-bottom: 0.5rem;
-            margin-bottom: 1rem;
-        }}
-        /* 最新文章完整顯示 */
-        .latest-article {{
-            background: white;
-            border-radius: 16px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-        }}
-        .latest-category {{
-            display: inline-block;
-            background: {CATEGORY_COLORS.get(latest['category'], "#6c757d")};
-            color: white;
-            padding: 0.2rem 0.8rem;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            margin-bottom: 1rem;
-        }}
-        .latest-title {{
-            font-size: 1.8rem;
-            color: #2c5e2e;
-            margin-bottom: 0.5rem;
-        }}
-        .latest-date {{
-            color: #7f8c6d;
-            margin-bottom: 1.5rem;
-            font-size: 0.9rem;
-        }}
-        .latest-content {{
-            line-height: 1.8;
-            color: #2c3e2f;
-        }}
-        .latest-content p {{
-            margin: 1rem 0;
-        }}
-        .read-more {{
-            display: inline-block;
-            margin-top: 1rem;
-            color: #4a7c59;
-            text-decoration: none;
-            font-weight: 500;
-        }}
-        /* 過往文章列表 */
-        .past-list {{
-            list-style: none;
-            padding: 0;
-        }}
-        .past-item {{
-            margin-bottom: 1rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid #f0e8e0;
-        }}
-        .past-link {{
-            font-size: 0.95rem;
-            font-weight: 500;
-            color: #4a7c59;
-            text-decoration: none;
-            display: block;
-        }}
-        .past-link:hover {{
-            text-decoration: underline;
-        }}
-        .past-meta {{
-            font-size: 0.7rem;
-            color: #aaa;
-            margin-top: 0.25rem;
-        }}
-        .past-badge {{
-            display: inline-block;
-            font-size: 0.65rem;
-            padding: 0.1rem 0.5rem;
-            border-radius: 12px;
-            color: white;
-            margin-right: 0.5rem;
-        }}
-        .archive-month {{
-            margin-bottom: 1rem;
-        }}
-        .archive-month-title {{
-            font-weight: 600;
-            color: #4a7c59;
-            margin-bottom: 0.5rem;
-        }}
-        .archive-list {{
-            list-style: none;
-            padding-left: 0.5rem;
-        }}
-        .archive-list li {{
-            margin-bottom: 0.3rem;
-        }}
-        .archive-list a {{
-            color: #7f8c6d;
-            text-decoration: none;
-            font-size: 0.85rem;
-        }}
-        .archive-list a:hover {{
-            color: #4a7c59;
-            text-decoration: underline;
-        }}
-        .back-link {{
-            display: inline-block;
-            margin-top: 2rem;
-            color: #4a7c59;
-            text-decoration: none;
-        }}
-        @media (max-width: 768px) {{
-            .main-layout {{
-                flex-direction: column;
-            }}
-            .latest-title {{
-                font-size: 1.4rem;
-            }}
-        }}
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; background: #faf8f4; color: #2c3e2f; }
+        h1 { color: #2c5e2e; border-left: 4px solid #6b8c5c; padding-left: 1rem; }
+        .article-list { list-style: none; padding: 0; }
+        .article-item { margin: 1rem 0; padding: 1rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .article-link { font-size: 1.1rem; font-weight: 500; color: #4a7c59; text-decoration: none; display: block; }
+        .article-link:hover { text-decoration: underline; }
+        .article-date { color: #7f8c6d; font-size: 0.8rem; margin-top: 0.3rem; }
+        .category-badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.7rem; color: white; margin-right: 0.5rem; }
+        .footer { text-align: center; margin-top: 2rem; color: #7f8c6d; font-size: 0.8rem; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🌿 蕨積每日文章</h1>
-            <p>植物・永續・碳盤查・生活 — 每天一篇，與你一起成長</p>
-        </div>
-        
-        <div class="categories">
-            <button class="category-btn category-all" onclick="filterPastArticles('all')">📋 全部</button>
+    <h1>🌿 蕨積每日文章</h1>
+    <p style="color: #7f8c6d; margin-bottom: 1.5rem;">植物・永續・碳盤查・生活 — 每天一篇，與你一起成長</p>
+    <ul class="article-list">
 """
     
-    for cat in CATEGORIES:
-        color_class = f"category-{cat}"
-        index_content += f'            <button class="category-btn {color_class}" onclick="filterPastArticles(\'{cat}\')">📌 {cat}</button>\n'
-    
-    index_content += f"""
-        </div>
-        
-        <div class="main-layout">
-            <div class="content-area">
-                <!-- 最新文章：完整顯示 -->
-                <div class="latest-article">
-                    <div class="latest-category">📌 {latest['category']}</div>
-                    <h1 class="latest-title">{latest['title']}</h1>
-                    <div class="latest-date">📅 {latest['date']}</div>
-                    <div class="latest-content">
-                        {latest['content']}
-                    </div>
-                    <a href="{latest['filename']}" class="read-more">🔗 查看獨立頁面 →</a>
-                </div>
-                
-                <div class="section-title">📖 過往文章</div>
-                <ul class="past-list" id="past-list">
-"""
-    
-    # 過往文章列表（可篩選）
-    for article in past_articles[:20]:  # 顯示最近20篇
+    for article in articles[:30]:
         cat_color = CATEGORY_COLORS.get(article["category"], "#6c757d")
         index_content += f"""
-                    <li class="past-item" data-category="{article['category']}">
-                        <span class="past-badge" style="background: {cat_color};">{article['category']}</span>
-                        <a class="past-link" href="{article['filename']}">{article['title']}</a>
-                        <div class="past-meta">📅 {article['date']}</div>
-                    </li>"""
+        <li class="article-item">
+            <span class="category-badge" style="background: {cat_color};">{article['category']}</span>
+            <a class="article-link" href="{article['filename']}">{article['title']}</a>
+            <div class="article-date">📅 {article['date']}</div>
+        </li>"""
     
     index_content += """
-                </ul>
-            </div>
-            
-            <div class="sidebar">
-                <div class="section-title">📚 歷史歸檔</div>
-"""
-    
-    # 過往文章按月歸檔
-    sorted_months = sorted(archive_by_month.keys(), reverse=True)
-    for month in sorted_months:
-        month_display = f"{month[:4]}年{int(month[5:7])}月"
-        index_content += f"""
-                <div class="archive-month">
-                    <div class="archive-month-title">{month_display}</div>
-                    <ul class="archive-list">"""
-        for article in archive_by_month[month][:8]:  # 每個月最多顯示8篇
-            index_content += f'<li><a href="{article["filename"]}">{article["title"][:25]}{"..." if len(article["title"]) > 25 else ""}</a></li>'
-        if len(archive_by_month[month]) > 8:
-            index_content += f'<li><a href="#" style="color:#aaa;">... 共{len(archive_by_month[month])}篇</a></li>'
-        index_content += """
-                    </ul>
-                </div>"""
-    
-    index_content += """
-            </div>
-        </div>
-        
-        <a href="/" class="back-link">← 返回首頁</a>
+    </ul>
+    <div class="footer">
+        🌿 蕨積 - 讓生活多一點綠<br>
+        每日一篇，與你一起成長
     </div>
-    
-    <script>
-        function filterPastArticles(category) {
-            const items = document.querySelectorAll('#past-list .past-item');
-            items.forEach(item => {
-                if (category === 'all' || item.dataset.category === category) {
-                    item.style.display = '';
-                } else {
-                    item.style.display = 'none';
-                }
-            });
-        }
-    </script>
 </body>
 </html>"""
     
@@ -646,7 +378,7 @@ def commit_and_push_to_website():
                 shutil.copy2(src, dst)
                 print(f"🖼️ 複製圖片: {file}")
         
-        # 產生索引頁面（包含類別篩選、最新文章完整顯示、過往文章歸檔）
+        # 產生索引頁面
         generate_daily_post_index(daily_post_dir)
         
         # 提交並推送
