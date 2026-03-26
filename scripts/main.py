@@ -593,12 +593,18 @@ def generate_daily_post_index(daily_post_dir):
                 with open(filepath, "r", encoding="utf-8") as f:
                     full_content = f.read()
                     match_cat = re.search(r'<div class="article-category">📌 (.+?)</div>', full_content)
+                    if not match_cat:
+                        match_cat = re.search(r'<div class="category-tag">📌 (.+?)</div>', full_content)
                     if match_cat:
                         category = match_cat.group(1)
                     match_title = re.search(r'<h1 class="article-title">(.+?)</h1>', full_content)
+                    if not match_title:
+                        match_title = re.search(r'<h1>(.+?)</h1>', full_content)
                     if match_title:
                         title = match_title.group(1)
                     match_content = re.search(r'<div class="article-content">(.*?)</div>', full_content, re.DOTALL)
+                    if not match_content:
+                        match_content = re.search(r'<div class="content">(.*?)</div>', full_content, re.DOTALL)
                     if match_content:
                         content_html = match_content.group(1)
             except:
@@ -615,20 +621,23 @@ def generate_daily_post_index(daily_post_dir):
     articles.sort(key=lambda x: x["date"], reverse=True)
     
     if not articles:
+        # 無文章時的提示
         empty_html = f"""<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>蕨積每日文章</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
     <style>{get_template_styles()}</style>
 </head>
 <body>
     <div id="nav-placeholder"></div>
     <main class="content">
         <div style="text-align:center;padding:60px 20px;">
-            <h1>🌿 蕨積每日文章</h1>
-            <p>📭 目前還沒有文章，等待機器人發文中...</p>
+            <h1 style="font-family:'Noto Serif TC',serif;color:var(--moss);">🌿 蕨積每日文章</h1>
+            <p style="color:var(--stone);margin-top:1rem;">📭 目前還沒有文章，等待機器人發文中...</p>
         </div>
     </main>
     {get_footer_html()}
@@ -679,8 +688,11 @@ def generate_daily_post_index(daily_post_dir):
                         </ul>
                     </div>"""
     
-    # 使用普通字串拼接（不是 f-string）
-    index_html = """<!DOCTYPE html>
+    # 最新文章類別顏色
+    latest_cat_color = CATEGORY_COLORS.get(latest['category'], "#6c757d")
+    
+    # 生成完整 HTML（使用 f-string，但要小心 JavaScript 中的大括號）
+    index_html = f"""<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -689,21 +701,21 @@ def generate_daily_post_index(daily_post_dir):
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
-    <style>""" + get_template_styles() + """
+    <style>{get_template_styles()}
     /* ===== 每日文章專用樣式 ===== */
-    .daily-container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
-    .page-header { text-align: center; margin-bottom: 2rem; }
-    .page-header h1 { color: var(--moss); font-size: 2rem; font-family: 'Noto Serif TC', serif; }
-    .page-header p { color: var(--stone); margin-top: 0.5rem; }
+    .daily-container {{ max-width: 1200px; margin: 0 auto; padding: 0 2rem; }}
+    .page-header {{ text-align: center; margin-bottom: 2rem; }}
+    .page-header h1 {{ color: var(--moss); font-size: 2rem; font-family: 'Noto Serif TC', serif; }}
+    .page-header p {{ color: var(--stone); margin-top: 0.5rem; }}
     
-    .categories {
+    .categories {{
         display: flex;
         justify-content: center;
         gap: 1rem;
         flex-wrap: wrap;
         margin-bottom: 2rem;
-    }
-    .category-btn {
+    }}
+    .category-btn {{
         padding: 0.5rem 1.5rem;
         border-radius: 30px;
         border: none;
@@ -713,54 +725,54 @@ def generate_daily_post_index(daily_post_dir):
         transition: transform 0.2s;
         background: #e8e0d8;
         color: #4a5b4e;
-    }
-    .category-btn:hover { transform: translateY(-2px); }
-    .category-btn.active { background: #4a7c59; color: white; }
+    }}
+    .category-btn:hover {{ transform: translateY(-2px); }}
+    .category-btn.active {{ background: #4a7c59; color: white; }}
     
-    .two-columns { display: flex; gap: 2rem; flex-wrap: wrap; }
-    .main-col { flex: 3; min-width: 250px; }
-    .sidebar-col { flex: 1; min-width: 200px; background: white; border-radius: 16px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: fit-content; }
+    .two-columns {{ display: flex; gap: 2rem; flex-wrap: wrap; }}
+    .main-col {{ flex: 3; min-width: 250px; }}
+    .sidebar-col {{ flex: 1; min-width: 200px; background: white; border-radius: 16px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: fit-content; }}
     
-    .latest-article {
+    .latest-article {{
         background: white;
         border-radius: 16px;
         padding: 2rem;
         margin-bottom: 2rem;
         box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-    }
-    .latest-category {
+    }}
+    .latest-category {{
         display: inline-block;
-        background: """ + CATEGORY_COLORS.get(latest['category'], '#6c757d') + """;
+        background: {latest_cat_color};
         color: white;
         padding: 0.2rem 0.8rem;
         border-radius: 20px;
         font-size: 0.8rem;
         margin-bottom: 1rem;
-    }
-    .latest-title { font-size: 1.8rem; color: var(--moss); margin-bottom: 0.5rem; }
-    .latest-date { color: var(--stone); margin-bottom: 1.5rem; font-size: 0.9rem; }
-    .latest-content { line-height: 1.8; }
-    .read-more { display: inline-block; margin-top: 1rem; color: var(--fern); text-decoration: none; font-weight: 500; }
+    }}
+    .latest-title {{ font-size: 1.8rem; color: var(--moss); margin-bottom: 0.5rem; }}
+    .latest-date {{ color: var(--stone); margin-bottom: 1.5rem; font-size: 0.9rem; }}
+    .latest-content {{ line-height: 1.8; }}
+    .read-more {{ display: inline-block; margin-top: 1rem; color: var(--fern); text-decoration: none; font-weight: 500; }}
     
-    .section-title { font-size: 1.2rem; color: var(--moss); border-bottom: 2px solid #e0d6cc; padding-bottom: 0.5rem; margin-bottom: 1rem; }
-    .past-list { list-style: none; }
-    .past-item { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #f0e8e0; }
-    .past-link { font-size: 0.95rem; font-weight: 500; color: var(--fern); text-decoration: none; display: block; }
-    .past-link:hover { text-decoration: underline; }
-    .past-meta { font-size: 0.7rem; color: #aaa; margin-top: 0.25rem; }
-    .past-badge { display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.5rem; border-radius: 12px; color: white; margin-right: 0.5rem; }
-    .archive-month { margin-bottom: 1rem; }
-    .archive-month-title { font-weight: 600; color: var(--moss); margin-bottom: 0.5rem; }
-    .archive-list { list-style: none; padding-left: 0.5rem; }
-    .archive-list li { margin-bottom: 0.3rem; }
-    .archive-list a { color: var(--stone); text-decoration: none; font-size: 0.85rem; }
-    .archive-list a:hover { color: var(--fern); text-decoration: underline; }
+    .section-title {{ font-size: 1.2rem; color: var(--moss); border-bottom: 2px solid #e0d6cc; padding-bottom: 0.5rem; margin-bottom: 1rem; }}
+    .past-list {{ list-style: none; }}
+    .past-item {{ margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #f0e8e0; }}
+    .past-link {{ font-size: 0.95rem; font-weight: 500; color: var(--fern); text-decoration: none; display: block; }}
+    .past-link:hover {{ text-decoration: underline; }}
+    .past-meta {{ font-size: 0.7rem; color: #aaa; margin-top: 0.25rem; }}
+    .past-badge {{ display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.5rem; border-radius: 12px; color: white; margin-right: 0.5rem; }}
+    .archive-month {{ margin-bottom: 1rem; }}
+    .archive-month-title {{ font-weight: 600; color: var(--moss); margin-bottom: 0.5rem; }}
+    .archive-list {{ list-style: none; padding-left: 0.5rem; }}
+    .archive-list li {{ margin-bottom: 0.3rem; }}
+    .archive-list a {{ color: var(--stone); text-decoration: none; font-size: 0.85rem; }}
+    .archive-list a:hover {{ color: var(--fern); text-decoration: underline; }}
     
-    @media (max-width: 768px) {
-        .two-columns { flex-direction: column; }
-        .latest-title { font-size: 1.4rem; }
-        .daily-container { padding: 0 1rem; }
-    }
+    @media (max-width: 768px) {{
+        .two-columns {{ flex-direction: column; }}
+        .latest-title {{ font-size: 1.4rem; }}
+        .daily-container {{ padding: 0 1rem; }}
+    }}
     </style>
 </head>
 <body>
@@ -784,57 +796,62 @@ def generate_daily_post_index(daily_post_dir):
             <div class="two-columns">
                 <div class="main-col">
                     <div class="latest-article">
-                        <div class="latest-category">📌 """ + latest['category'] + """</div>
-                        <h1 class="latest-title">""" + latest['title'] + """</h1>
-                        <div class="latest-date">📅 """ + latest['date'] + """</div>
-                        <div class="latest-content">""" + latest['content'] + """</div>
-                        <a href=""" + latest['filename'] + """ class="read-more">🔗 查看獨立頁面 →</a>
+                        <div class="latest-category">📌 {latest['category']}</div>
+                        <h1 class="latest-title">{latest['title']}</h1>
+                        <div class="latest-date">📅 {latest['date']}</div>
+                        <div class="latest-content">{latest['content']}</div>
+                        <a href="{latest['filename']}" class="read-more">🔗 查看獨立頁面 →</a>
                     </div>
                     
                     <div class="section-title">📖 過往文章</div>
                     <ul class="past-list" id="pastList">
-                        """ + past_list_html + """
+                        {past_list_html}
                     </ul>
                 </div>
                 
                 <div class="sidebar-col">
                     <div class="section-title">📚 歷史歸檔</div>
-                    """ + archive_html + """
+                    {archive_html}
                 </div>
             </div>
         </div>
     </main>
     
-    """ + get_footer_html() + """
+    {get_footer_html()}
     
     <script>
-        const filterBtns = document.querySelectorAll('.category-btn');
-        
-        function filterArticles() {
-            const activeBtn = document.querySelector('.category-btn.active');
-            const category = activeBtn ? activeBtn.getAttribute('data-category') : 'all';
+        // 分類篩選功能
+        (function() {{
+            const filterBtns = document.querySelectorAll('.category-btn');
             const pastItems = document.querySelectorAll('#pastList .past-item');
             
-            pastItems.forEach(item => {
-                if (category === 'all' || item.getAttribute('data-category') === category) {
-                    item.style.display = '';
-                } else {
-                    item.style.display = 'none';
-                }
-            });
-        }
-        
-        filterBtns.forEach(btn => {
-            btn.addEventListener('click', function() {
-                filterBtns.forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                filterArticles();
-            });
-        });
-        
-        document.addEventListener('DOMContentLoaded', filterArticles);
+            function filterArticles() {{
+                const activeBtn = document.querySelector('.category-btn.active');
+                const category = activeBtn ? activeBtn.getAttribute('data-category') : 'all';
+                
+                pastItems.forEach(item => {{
+                    if (category === 'all' || item.getAttribute('data-category') === category) {{
+                        item.style.display = '';
+                    }} else {{
+                        item.style.display = 'none';
+                    }}
+                }});
+            }}
+            
+            filterBtns.forEach(btn => {{
+                btn.addEventListener('click', function() {{
+                    filterBtns.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    filterArticles();
+                }});
+            }});
+            
+            // 初始執行一次
+            filterArticles();
+        }})();
     </script>
-    """ + get_nav_script() + """
+    
+    {get_nav_script()}
 </body>
 </html>"""
     
