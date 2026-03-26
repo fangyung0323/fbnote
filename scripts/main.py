@@ -2,7 +2,7 @@
 """
 每日自動發文機器人
 - 使用 DeepSeek API 生成文章（四大類別輪換：植物、永續、碳盤查、生活）
-- 將文章保存為 HTML
+- 將文章保存為 HTML（套用官網模板）
 - 推送到網站倉庫的 daily-post 目錄
 - 自動生成套用官網模板的索引頁面
 """
@@ -95,120 +95,6 @@ def get_today_category():
     day_of_year = datetime.now().timetuple().tm_yday
     category_index = (day_of_year - 1) % len(CATEGORIES)
     return CATEGORIES[category_index]
-
-# ==================== 文章生成 ====================
-def generate_article():
-    """调用 DeepSeek API 生成文章内容"""
-    if not DEEPSEEK_API_KEY:
-        print("❌ 錯誤：DEEPSEEK_API_KEY 環境變數未設定")
-        return None, None, None
-    
-    category = get_today_category()
-    prompt = PROMPT_TEMPLATES[category]
-    
-    print(f"📌 今日主題類別：{category}")
-    
-    headers = {
-        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    payload = {
-        "model": "deepseek-chat",
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPTS[category]},
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": 0.7,
-        "max_tokens": 1500
-    }
-    
-    print("🤖 正在呼叫 DeepSeek API 生成文章...")
-    try:
-        response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=60)
-        response.raise_for_status()
-        data = response.json()
-        content = data["choices"][0]["message"]["content"]
-        
-        lines = content.strip().split("\n")
-        title = lines[0].replace("#", "").strip()
-        if not title:
-            title = f"{category}日誌 {datetime.now().strftime('%Y-%m-%d')}"
-        
-        print(f"✅ 文章生成成功：{title}")
-        print(f"📂 類別：{category}")
-        return title, content, category
-    except Exception as e:
-        print(f"❌ API 呼叫失敗：{e}")
-        return None, None, None
-
-def save_article_as_html(title, content, category, output_dir="articles"):
-    """將文章儲存為 HTML 檔案"""
-    os.makedirs(output_dir, exist_ok=True)
-    
-    date_str = datetime.now().strftime("%Y-%m-%d")
-    safe_title = title.replace(" ", "-").replace("/", "-").replace("?", "").replace("！", "")[:50]
-    filename = f"{date_str}-{safe_title}.html"
-    filepath = os.path.join(output_dir, filename)
-    
-    category_color = CATEGORY_COLORS.get(category, "#4a7c59")
-    content_html = content.replace(chr(10), "<br>")
-    
-    html_content = f"""<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title} - 蕨積每日文章</title>
-    <style>
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.8;
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 2rem;
-            background: #faf8f4;
-            color: #2c3e2f;
-        }}
-        .category-tag {{
-            display: inline-block;
-            background: {category_color};
-            color: white;
-            padding: 0.2rem 0.8rem;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            margin-bottom: 1rem;
-        }}
-        h1 {{ color: #2c5e2e; border-left: 4px solid #6b8c5c; padding-left: 1rem; margin: 1rem 0; }}
-        .date {{ color: #7f8c6d; margin-bottom: 2rem; }}
-        .content {{ margin: 2rem 0; }}
-        hr {{ margin: 2rem 0; border: none; border-top: 1px solid #e0d6cc; }}
-        .footer {{ text-align: center; margin-top: 3rem; color: #7f8c6d; font-size: 0.9rem; }}
-        .back-link {{
-            display: inline-block;
-            margin-top: 1rem;
-            color: #4a7c59;
-            text-decoration: none;
-        }}
-    </style>
-</head>
-<body>
-    <div class="category-tag">📌 {category}</div>
-    <h1>{title}</h1>
-    <div class="date">📅 {datetime.now().strftime("%Y年%m月%d日")}</div>
-    <div class="content">{content_html}</div>
-    <hr>
-    <div class="footer">🌿 蕨積 - 讓生活多一點綠<br>每日一篇，與你一起成長</div>
-    <a href="index.html" class="back-link">← 返回文章列表</a>
-</body>
-</html>"""
-    
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write(html_content)
-    
-    print(f"📄 文章已儲存：{filepath}")
-    return filepath
 
 # ==================== 模板輔助函數 ====================
 def get_template_styles():
@@ -467,16 +353,16 @@ def get_footer_html():
     """返回 footer HTML"""
     return """<footer>
     <ul class="footer-links">
-      <li><a href="shop.html">植物選品</a></li>
-      <li><a href="consult.html">綠色顧問</a></li>
-      <li><a href="fbnote.html">蕨望筆記</a></li>
-      <li><a href="about.html">關於蕨積</a></li>
+      <li><a href="../shop.html">植物選品</a></li>
+      <li><a href="../consult.html">綠色顧問</a></li>
+      <li><a href="../fbnote.html">蕨望筆記</a></li>
+      <li><a href="../about.html">關於蕨積</a></li>
     </ul>
     <p class="footer-copy">© 2026 蕨積 FernBrom . All rights reserved.</p>
   </footer>"""
 
 def get_nav_script():
-    """返回導覽列載入腳本"""
+    """返回導覽列載入腳本（從上層目錄載入）"""
     return """document.addEventListener('DOMContentLoaded', function () {
       fetch('../nav.html')
         .then(response => response.text())
@@ -532,6 +418,154 @@ def get_nav_script():
       }
     });"""
 
+# ==================== 文章生成 ====================
+def generate_article():
+    """调用 DeepSeek API 生成文章内容"""
+    if not DEEPSEEK_API_KEY:
+        print("❌ 錯誤：DEEPSEEK_API_KEY 環境變數未設定")
+        return None, None, None
+    
+    category = get_today_category()
+    prompt = PROMPT_TEMPLATES[category]
+    
+    print(f"📌 今日主題類別：{category}")
+    
+    headers = {
+        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": "deepseek-chat",
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPTS[category]},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.7,
+        "max_tokens": 1500
+    }
+    
+    print("🤖 正在呼叫 DeepSeek API 生成文章...")
+    try:
+        response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=60)
+        response.raise_for_status()
+        data = response.json()
+        content = data["choices"][0]["message"]["content"]
+        
+        lines = content.strip().split("\n")
+        title = lines[0].replace("#", "").strip()
+        if not title:
+            title = f"{category}日誌 {datetime.now().strftime('%Y-%m-%d')}"
+        
+        print(f"✅ 文章生成成功：{title}")
+        print(f"📂 類別：{category}")
+        return title, content, category
+    except Exception as e:
+        print(f"❌ API 呼叫失敗：{e}")
+        return None, None, None
+
+def save_article_as_html(title, content, category, output_dir="articles"):
+    """將文章儲存為 HTML 檔案（套用官網模板，內容在 <main> 內）"""
+    os.makedirs(output_dir, exist_ok=True)
+    
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    safe_title = title.replace(" ", "-").replace("/", "-").replace("?", "").replace("！", "")[:50]
+    filename = f"{date_str}-{safe_title}.html"
+    filepath = os.path.join(output_dir, filename)
+    
+    category_color = CATEGORY_COLORS.get(category, "#4a7c59")
+    content_html = content.replace(chr(10), "<br>")
+    
+    # 套用官網模板的獨立文章頁面
+    html_content = f"""<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title} - 蕨積每日文章</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>{get_template_styles()}
+    /* ===== 獨立文章專用樣式 ===== */
+    .article-container {{
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 0 2rem;
+    }}
+    .article-category {{
+        display: inline-block;
+        background: {category_color};
+        color: white;
+        padding: 0.2rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        margin-bottom: 1rem;
+    }}
+    .article-title {{
+        font-size: 2rem;
+        color: var(--moss);
+        margin-bottom: 0.5rem;
+        font-family: 'Noto Serif TC', serif;
+    }}
+    .article-date {{
+        color: var(--stone);
+        margin-bottom: 2rem;
+        font-size: 0.9rem;
+    }}
+    .article-content {{
+        line-height: 1.8;
+        font-size: 1rem;
+    }}
+    .article-footer {{
+        text-align: center;
+        margin-top: 3rem;
+        padding-top: 2rem;
+        border-top: 1px solid #e0d6cc;
+        color: var(--stone);
+        font-size: 0.9rem;
+    }}
+    .back-link {{
+        display: inline-block;
+        margin-top: 1rem;
+        color: var(--fern);
+        text-decoration: none;
+    }}
+    @media (max-width: 768px) {{
+        .article-title {{ font-size: 1.5rem; }}
+        .article-container {{ padding: 0 1rem; }}
+    }}
+    </style>
+</head>
+<body>
+    <div id="nav-placeholder"></div>
+    
+    <main class="content">
+        <div class="article-container">
+            <div class="article-category">📌 {category}</div>
+            <h1 class="article-title">{title}</h1>
+            <div class="article-date">📅 {datetime.now().strftime("%Y年%m月%d日")}</div>
+            <div class="article-content">{content_html}</div>
+            <div class="article-footer">
+                🌿 蕨積 - 讓生活多一點綠<br>
+                每日一篇，與你一起成長
+            </div>
+            <a href="index.html" class="back-link">← 返回文章列表</a>
+        </div>
+    </main>
+    
+    {get_footer_html()}
+    
+    <script>{get_nav_script()}</script>
+</body>
+</html>"""
+    
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(html_content)
+    
+    print(f"📄 文章已儲存：{filepath}")
+    return filepath
+
 # ==================== 索引頁面生成（套用官網模板） ====================
 def generate_daily_post_index(daily_post_dir):
     """產生 daily-post 目錄的索引頁面
@@ -551,13 +585,13 @@ def generate_daily_post_index(daily_post_dir):
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
                     full_content = f.read()
-                    match_cat = re.search(r'<div class="category-tag">📌 (.+?)</div>', full_content)
+                    match_cat = re.search(r'<div class="article-category">📌 (.+?)</div>', full_content)
                     if match_cat:
                         category = match_cat.group(1)
-                    match_title = re.search(r'<h1>(.+?)</h1>', full_content)
+                    match_title = re.search(r'<h1 class="article-title">(.+?)</h1>', full_content)
                     if match_title:
                         title = match_title.group(1)
-                    match_content = re.search(r'<div class="content">(.*?)</div>', full_content, re.DOTALL)
+                    match_content = re.search(r'<div class="article-content">(.*?)</div>', full_content, re.DOTALL)
                     if match_content:
                         content_html = match_content.group(1)
             except:
