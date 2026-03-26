@@ -361,12 +361,14 @@ def get_footer_html():
   </footer>"""
 
 def get_nav_script():
-    return """
+    return r"""
 document.addEventListener('DOMContentLoaded', function () {
   fetch('/nav.html')
     .then(response => response.text())
     .then(data => {
-      document.getElementById('nav-placeholder').innerHTML = data;
+      let fixedData = data.replace(/href="(?!https?:\/\/|\/)([^"]+)"/g, 'href="/$1"');
+      fixedData = fixedData.replace(/href="\/([^"]+)"/g, 'href="/$1"');
+      document.getElementById('nav-placeholder').innerHTML = fixedData;
       initNav();
     })
     .catch(err => {
