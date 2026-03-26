@@ -578,12 +578,9 @@ def save_article_as_html(title, content, category, output_dir="articles"):
 
 # ==================== 索引頁面生成（套用官網模板） ====================
 def generate_daily_post_index(daily_post_dir):
-    """產生 daily-post 目錄的索引頁面
-    套用官網模板樣式，所有內容放在 <main> 內
-    """
+    """產生 daily-post 目錄的索引頁面"""
     articles = []
     for file in os.listdir(daily_post_dir):
-        # 只處理以日期開頭的 HTML 檔案 (格式: YYYY-MM-DD-*.html)
         if file.endswith(".html") and file != "index.html" and len(file) >= 10 and file[4] == '-' and file[7] == '-':
             filepath = os.path.join(daily_post_dir, file)
             
@@ -618,24 +615,20 @@ def generate_daily_post_index(daily_post_dir):
     articles.sort(key=lambda x: x["date"], reverse=True)
     
     if not articles:
-        # 無文章時的提示
         empty_html = f"""<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>蕨積每日文章 - 生活隨筆</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <title>蕨積每日文章</title>
     <style>{get_template_styles()}</style>
 </head>
 <body>
     <div id="nav-placeholder"></div>
     <main class="content">
-        <div style="text-align: center; padding: 60px 20px;">
-            <h1 style="font-family: 'Noto Serif TC', serif; color: var(--moss);">🌿 蕨積每日文章</h1>
-            <p style="color: var(--stone); margin-top: 1rem;">📭 目前還沒有文章，等待機器人發文中...</p>
+        <div style="text-align:center;padding:60px 20px;">
+            <h1>🌿 蕨積每日文章</h1>
+            <p>📭 目前還沒有文章，等待機器人發文中...</p>
         </div>
     </main>
     {get_footer_html()}
@@ -658,8 +651,36 @@ def generate_daily_post_index(daily_post_dir):
             archive_by_month[month_key] = []
         archive_by_month[month_key].append(article)
     
-    # 生成完整 HTML
-    index_html = f"""<!DOCTYPE html>
+    # 生成過往文章列表 HTML
+    past_list_html = ""
+    for article in past_articles[:30]:
+        cat_color = CATEGORY_COLORS.get(article["category"], "#6c757d")
+        past_list_html += f"""
+                        <li class="past-item" data-category="{article['category']}">
+                            <span class="past-badge" style="background: {cat_color};">{article['category']}</span>
+                            <a class="past-link" href="{article['filename']}">{article['title']}</a>
+                            <div class="past-meta">📅 {article['date']}</div>
+                        </li>"""
+    
+    # 生成歸檔 HTML
+    archive_html = ""
+    sorted_months = sorted(archive_by_month.keys(), reverse=True)
+    for month in sorted_months:
+        month_display = f"{month[:4]}年{int(month[5:7])}月"
+        archive_html += f"""
+                    <div class="archive-month">
+                        <div class="archive-month-title">{month_display}</div>
+                        <ul class="archive-list">"""
+        for article in archive_by_month[month][:8]:
+            archive_html += f'<li><a href="{article["filename"]}">{article["title"][:25]}{"..." if len(article["title"]) > 25 else ""}</a></li>'
+        if len(archive_by_month[month]) > 8:
+            archive_html += f'<li><a href="#" style="color:#aaa;">... 共{len(archive_by_month[month])}篇</a></li>'
+        archive_html += """
+                        </ul>
+                    </div>"""
+    
+    # 使用普通字串拼接（不是 f-string）
+    index_html = """<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -668,21 +689,21 @@ def generate_daily_post_index(daily_post_dir):
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
-    <style>{get_template_styles()}
+    <style>""" + get_template_styles() + """
     /* ===== 每日文章專用樣式 ===== */
-    .daily-container {{ max-width: 1200px; margin: 0 auto; padding: 0 2rem; }}
-    .page-header {{ text-align: center; margin-bottom: 2rem; }}
-    .page-header h1 {{ color: var(--moss); font-size: 2rem; font-family: 'Noto Serif TC', serif; }}
-    .page-header p {{ color: var(--stone); margin-top: 0.5rem; }}
+    .daily-container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
+    .page-header { text-align: center; margin-bottom: 2rem; }
+    .page-header h1 { color: var(--moss); font-size: 2rem; font-family: 'Noto Serif TC', serif; }
+    .page-header p { color: var(--stone); margin-top: 0.5rem; }
     
-    .categories {{
+    .categories {
         display: flex;
         justify-content: center;
         gap: 1rem;
         flex-wrap: wrap;
         margin-bottom: 2rem;
-    }}
-    .category-btn {{
+    }
+    .category-btn {
         padding: 0.5rem 1.5rem;
         border-radius: 30px;
         border: none;
@@ -692,58 +713,54 @@ def generate_daily_post_index(daily_post_dir):
         transition: transform 0.2s;
         background: #e8e0d8;
         color: #4a5b4e;
-    }}
-    .category-btn:hover {{ transform: translateY(-2px); }}
-    .category-btn.active {{ background: #4a7c59; color: white; }}
-    .category-植物.active {{ background: #4a7c59; }}
-    .category-永續.active {{ background: #2c7a4d; }}
-    .category-碳盤查.active {{ background: #1e6f5c; }}
-    .category-生活.active {{ background: #b88b4a; }}
+    }
+    .category-btn:hover { transform: translateY(-2px); }
+    .category-btn.active { background: #4a7c59; color: white; }
     
-    .two-columns {{ display: flex; gap: 2rem; flex-wrap: wrap; }}
-    .main-col {{ flex: 3; min-width: 250px; }}
-    .sidebar-col {{ flex: 1; min-width: 200px; background: white; border-radius: 16px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: fit-content; }}
+    .two-columns { display: flex; gap: 2rem; flex-wrap: wrap; }
+    .main-col { flex: 3; min-width: 250px; }
+    .sidebar-col { flex: 1; min-width: 200px; background: white; border-radius: 16px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: fit-content; }
     
-    .latest-article {{
+    .latest-article {
         background: white;
         border-radius: 16px;
         padding: 2rem;
         margin-bottom: 2rem;
         box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-    }}
-    .latest-category {{
+    }
+    .latest-category {
         display: inline-block;
-        background: {CATEGORY_COLORS.get(latest['category'], '#6c757d')};
+        background: """ + CATEGORY_COLORS.get(latest['category'], '#6c757d') + """;
         color: white;
         padding: 0.2rem 0.8rem;
         border-radius: 20px;
         font-size: 0.8rem;
         margin-bottom: 1rem;
-    }}
-    .latest-title {{ font-size: 1.8rem; color: var(--moss); margin-bottom: 0.5rem; }}
-    .latest-date {{ color: var(--stone); margin-bottom: 1.5rem; font-size: 0.9rem; }}
-    .latest-content {{ line-height: 1.8; }}
-    .read-more {{ display: inline-block; margin-top: 1rem; color: var(--fern); text-decoration: none; font-weight: 500; }}
+    }
+    .latest-title { font-size: 1.8rem; color: var(--moss); margin-bottom: 0.5rem; }
+    .latest-date { color: var(--stone); margin-bottom: 1.5rem; font-size: 0.9rem; }
+    .latest-content { line-height: 1.8; }
+    .read-more { display: inline-block; margin-top: 1rem; color: var(--fern); text-decoration: none; font-weight: 500; }
     
-    .section-title {{ font-size: 1.2rem; color: var(--moss); border-bottom: 2px solid #e0d6cc; padding-bottom: 0.5rem; margin-bottom: 1rem; }}
-    .past-list {{ list-style: none; }}
-    .past-item {{ margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #f0e8e0; }}
-    .past-link {{ font-size: 0.95rem; font-weight: 500; color: var(--fern); text-decoration: none; display: block; }}
-    .past-link:hover {{ text-decoration: underline; }}
-    .past-meta {{ font-size: 0.7rem; color: #aaa; margin-top: 0.25rem; }}
-    .past-badge {{ display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.5rem; border-radius: 12px; color: white; margin-right: 0.5rem; }}
-    .archive-month {{ margin-bottom: 1rem; }}
-    .archive-month-title {{ font-weight: 600; color: var(--moss); margin-bottom: 0.5rem; }}
-    .archive-list {{ list-style: none; padding-left: 0.5rem; }}
-    .archive-list li {{ margin-bottom: 0.3rem; }}
-    .archive-list a {{ color: var(--stone); text-decoration: none; font-size: 0.85rem; }}
-    .archive-list a:hover {{ color: var(--fern); text-decoration: underline; }}
+    .section-title { font-size: 1.2rem; color: var(--moss); border-bottom: 2px solid #e0d6cc; padding-bottom: 0.5rem; margin-bottom: 1rem; }
+    .past-list { list-style: none; }
+    .past-item { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #f0e8e0; }
+    .past-link { font-size: 0.95rem; font-weight: 500; color: var(--fern); text-decoration: none; display: block; }
+    .past-link:hover { text-decoration: underline; }
+    .past-meta { font-size: 0.7rem; color: #aaa; margin-top: 0.25rem; }
+    .past-badge { display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.5rem; border-radius: 12px; color: white; margin-right: 0.5rem; }
+    .archive-month { margin-bottom: 1rem; }
+    .archive-month-title { font-weight: 600; color: var(--moss); margin-bottom: 0.5rem; }
+    .archive-list { list-style: none; padding-left: 0.5rem; }
+    .archive-list li { margin-bottom: 0.3rem; }
+    .archive-list a { color: var(--stone); text-decoration: none; font-size: 0.85rem; }
+    .archive-list a:hover { color: var(--fern); text-decoration: underline; }
     
-    @media (max-width: 768px) {{
-        .two-columns {{ flex-direction: column; }}
-        .latest-title {{ font-size: 1.4rem; }}
-        .daily-container {{ padding: 0 1rem; }}
-    }}
+    @media (max-width: 768px) {
+        .two-columns { flex-direction: column; }
+        .latest-title { font-size: 1.4rem; }
+        .daily-container { padding: 0 1rem; }
+    }
     </style>
 </head>
 <body>
@@ -753,70 +770,43 @@ def generate_daily_post_index(daily_post_dir):
         <div class="daily-container">
             <div class="page-header">
                 <h1>🌿 蕨積每日文章</h1>
-                <p>每天一篇，與您一起成長</p>
+                <p>植物・永續・碳盤查・生活 — 每天一篇，與你一起成長</p>
             </div>
             
             <div class="categories">
                 <button class="category-btn active" data-category="all">📋 全部</button>
-                <button class="category-btn category-植物" data-category="植物">🌿 植物</button>
-                <button class="category-btn category-永續" data-category="永續">♻️ 永續</button>
-                <button class="category-btn category-碳盤查" data-category="碳盤查">📊 碳盤查</button>
-                <button class="category-btn category-生活" data-category="生活">🏡 生活</button>
+                <button class="category-btn" data-category="植物">🌿 植物</button>
+                <button class="category-btn" data-category="永續">♻️ 永續</button>
+                <button class="category-btn" data-category="碳盤查">📊 碳盤查</button>
+                <button class="category-btn" data-category="生活">🏡 生活</button>
             </div>
             
             <div class="two-columns">
                 <div class="main-col">
                     <div class="latest-article">
-                        <div class="latest-category">📌 {latest['category']}</div>
-                        <h1 class="latest-title">{latest['title']}</h1>
-                        <div class="latest-date">📅 {latest['date']}</div>
-                        <div class="latest-content">{latest['content']}</div>
-                        <a href="{latest['filename']}" class="read-more">🔗 查看獨立頁面 →</a>
+                        <div class="latest-category">📌 """ + latest['category'] + """</div>
+                        <h1 class="latest-title">""" + latest['title'] + """</h1>
+                        <div class="latest-date">📅 """ + latest['date'] + """</div>
+                        <div class="latest-content">""" + latest['content'] + """</div>
+                        <a href=""" + latest['filename'] + """ class="read-more">🔗 查看獨立頁面 →</a>
                     </div>
                     
                     <div class="section-title">📖 過往文章</div>
-                    <ul class="past-list" id="pastList">"""
-    
-    for article in past_articles[:30]:
-        cat_color = CATEGORY_COLORS.get(article["category"], "#6c757d")
-        index_html += f"""
-                        <li class="past-item" data-category="{article['category']}">
-                            <span class="past-badge" style="background: {cat_color};">{article['category']}</span>
-                            <a class="past-link" href="{article['filename']}">{article['title']}</a>
-                            <div class="past-meta">📅 {article['date']}</div>
-                        </li>"""
-    
-    index_html += """
+                    <ul class="past-list" id="pastList">
+                        """ + past_list_html + """
                     </ul>
                 </div>
                 
                 <div class="sidebar-col">
-                    <div class="section-title">📚 歷史歸檔</div>"""
-    
-    sorted_months = sorted(archive_by_month.keys(), reverse=True)
-    for month in sorted_months:
-        month_display = f"{month[:4]}年{int(month[5:7])}月"
-        index_html += f"""
-                    <div class="archive-month">
-                        <div class="archive-month-title">{month_display}</div>
-                        <ul class="archive-list">"""
-        for article in archive_by_month[month][:8]:
-            index_html += f'<li><a href="{article["filename"]}">{article["title"][:25]}{"..." if len(article["title"]) > 25 else ""}</a></li>'
-        if len(archive_by_month[month]) > 8:
-            index_html += f'<li><a href="#" style="color:#aaa;">... 共{len(archive_by_month[month])}篇</a></li>'
-        index_html += """
-                        </ul>
-                    </div>"""
-    
-    index_html += f"""
+                    <div class="section-title">📚 歷史歸檔</div>
+                    """ + archive_html + """
                 </div>
             </div>
         </div>
     </main>
     
-    {get_footer_html()}
+    """ + get_footer_html() + """
     
-     index_html += """
     <script>
         const filterBtns = document.querySelectorAll('.category-btn');
         
@@ -844,7 +834,7 @@ def generate_daily_post_index(daily_post_dir):
         
         document.addEventListener('DOMContentLoaded', filterArticles);
     </script>
-"""
+    """ + get_nav_script() + """
 </body>
 </html>"""
     
