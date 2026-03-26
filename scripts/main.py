@@ -218,17 +218,18 @@ def save_article_as_html(title, content, category, output_dir="articles"):
     print(f"📄 文章已儲存：{filepath}")
     return filepath
 
-# ==================== 索引頁面生成（簡化穩定版） ====================
+# ==================== 索引頁面生成（只顯示正式文章） ====================
 def generate_daily_post_index(daily_post_dir):
-    """產生 daily-post 目錄的索引頁面（簡化版，確保穩定）"""
+    """產生 daily-post 目錄的索引頁面（只顯示正式文章）"""
     articles = []
     for file in os.listdir(daily_post_dir):
-        if file.endswith(".html") and file != "index.html":
+        # 只處理以日期開頭的 HTML 檔案 (格式: YYYY-MM-DD-*.html)
+        if file.endswith(".html") and file != "index.html" and len(file) >= 10 and file[4] == '-' and file[7] == '-':
             filepath = os.path.join(daily_post_dir, file)
             
             category = "未分類"
             title = ""
-            date_str = file[:10] if len(file) >= 10 else "0000-00-00"
+            date_str = file[:10]
             
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
@@ -244,6 +245,7 @@ def generate_daily_post_index(daily_post_dir):
                     if match_title:
                         title = match_title.group(1)
                     else:
+                        # 從檔名提取標題
                         title = file.replace(".html", "").replace(date_str + "-", "").replace("-", " / ")
             except Exception as e:
                 print(f"⚠️ 讀取檔案失敗 {file}: {e}")
@@ -259,7 +261,32 @@ def generate_daily_post_index(daily_post_dir):
     articles.sort(key=lambda x: x["date"], reverse=True)
     
     if not articles:
-        print("⚠️ 沒有找到文章")
+        print("⚠️ 沒有找到正式文章")
+        # 如果沒有正式文章，顯示提示訊息
+        index_content = """<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>蕨積每日文章</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; background: #faf8f4; color: #2c3e2f; text-align: center; }
+        h1 { color: #2c5e2e; }
+        .message { padding: 3rem; background: white; border-radius: 16px; margin-top: 2rem; }
+    </style>
+</head>
+<body>
+    <h1>🌿 蕨積每日文章</h1>
+    <div class="message">
+        <p>📭 目前還沒有文章</p>
+        <p>每日發文機器人正在準備中，敬請期待！</p>
+    </div>
+</body>
+</html>"""
+        index_path = os.path.join(daily_post_dir, "index.html")
+        with open(index_path, "w", encoding="utf-8") as f:
+            f.write(index_content)
+        print("📑 已更新 daily-post/index.html (無文章)")
         return
     
     # 生成簡潔的 HTML
@@ -272,6 +299,7 @@ def generate_daily_post_index(daily_post_dir):
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; background: #faf8f4; color: #2c3e2f; }
         h1 { color: #2c5e2e; border-left: 4px solid #6b8c5c; padding-left: 1rem; }
+        .subtitle { color: #7f8c6d; margin-bottom: 1.5rem; }
         .article-list { list-style: none; padding: 0; }
         .article-item { margin: 1rem 0; padding: 1rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         .article-link { font-size: 1.1rem; font-weight: 500; color: #4a7c59; text-decoration: none; display: block; }
@@ -283,7 +311,7 @@ def generate_daily_post_index(daily_post_dir):
 </head>
 <body>
     <h1>🌿 蕨積每日文章</h1>
-    <p style="color: #7f8c6d; margin-bottom: 1.5rem;">植物・永續・碳盤查・生活 — 每天一篇，與你一起成長</p>
+    <div class="subtitle">植物・永續・碳盤查・生活 — 每天一篇，與你一起成長</div>
     <ul class="article-list">
 """
     
@@ -308,7 +336,7 @@ def generate_daily_post_index(daily_post_dir):
     index_path = os.path.join(daily_post_dir, "index.html")
     with open(index_path, "w", encoding="utf-8") as f:
         f.write(index_content)
-    print("📑 已更新 daily-post/index.html")
+    print(f"📑 已更新 daily-post/index.html (共 {len(articles)} 篇文章)")
 
 # ==================== 推送到網站倉庫 ====================
 def commit_and_push_to_website():
