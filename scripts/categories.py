@@ -12,7 +12,7 @@ CATEGORIES = {
         - 植物與身心靈健康的關係
         
         文章風格：溫暖、親切、易讀，讓讀者感受到植物的療癒力量。
-        長度：約600-800字。
+        長度：約400-600字。
         """,
         "image_prompt": "Beautiful plant in natural environment, soft lighting, nature photography style, 4k, highly detailed",
         "tags": ["植物", "園藝", "療癒", "生活美學"]
@@ -28,7 +28,7 @@ CATEGORIES = {
         - 碳盤查的國際標準與趨勢
         
         文章風格：專業但易懂，數據佐證，實用性強。
-        長度：約600-800字。
+        長度：約400-600字。
         """,
         "image_prompt": "Carbon footprint concept, green technology, sustainability, clean energy, infographic style, modern design",
         "tags": ["碳盤查", "碳足跡", "ESG", "永續發展"]
@@ -44,7 +44,7 @@ CATEGORIES = {
         - 全球永續趨勢與在地行動
         
         文章風格：積極正面，具體可行，啟發讀者行動。
-        長度：約600-800字。
+        長度：約400-600字。
         """,
         "image_prompt": "Sustainable lifestyle, eco-friendly, green energy, circular economy, nature and technology harmony",
         "tags": ["永續", "環保", "循環經濟", "綠色生活"]
@@ -60,7 +60,7 @@ CATEGORIES = {
         - 簡單生活中的幸福時刻
         
         文章風格：溫暖、療癒、有深度，引發共鳴。
-        長度：約600-800字。
+        長度：約400-600字。
         """,
         "image_prompt": "Cozy lifestyle, peaceful home interior, warm atmosphere, mindfulness concept, aesthetic photography",
         "tags": ["生活風格", "慢生活", "心靈成長", "美學"]
