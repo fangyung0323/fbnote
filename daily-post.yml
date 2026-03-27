@@ -4,6 +4,18 @@ on:
   schedule:
     - cron: '0 9 * * *'
   workflow_dispatch:
+    inputs:
+      category:
+        description: '選擇文章類別'
+        required: false
+        type: choice
+        options:
+          - 自動（依日期輪換）
+          - 植物
+          - 永續
+          - 碳盤查
+          - 生活
+        default: '自動（依日期輪換）'
 
 jobs:
   post:
@@ -25,4 +37,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_USERNAME: ${{ secrets.TARGET_USERNAME }}
           WEBSITE_REPO_NAME: ${{ secrets.TARGET_REPO_NAME }}
+          MANUAL_CATEGORY: ${{ github.event.inputs.category }}
         run: python scripts/main.py
