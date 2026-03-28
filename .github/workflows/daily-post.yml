@@ -6,16 +6,45 @@ on:
   workflow_dispatch:
     inputs:
       category:
-        description: '選擇文章類別'
+        description: '選擇文章類別（自動/植物/永續/碳盤查/生活）'
         required: false
-        type: choice
-        options:
-          - 自動（依日期輪換）
-          - 植物
-          - 永續
-          - 碳盤查
-          - 生活
-        default: '自動（依日期輪換）'
+        type: string
+        default: ''
+      ai_role:
+        description: 'AI 角色（例如：植物學科普作家）'
+        required: false
+        type: string
+        default: ''
+      writing_style:
+        description: '寫作風格（例如：輕鬆活潑，像朋友聊天）'
+        required: false
+        type: string
+        default: ''
+      article_structure:
+        description: '文章結構（例如：開門見山：開頭直接點出主題和觀點）'
+        required: false
+        type: string
+        default: ''
+      plant_topic:
+        description: '植物主題（留空則隨機）'
+        required: false
+        type: string
+        default: ''
+      sustain_topic:
+        description: '永續主題（留空則隨機）'
+        required: false
+        type: string
+        default: ''
+      carbon_topic:
+        description: '碳盤查主題（留空則隨機）'
+        required: false
+        type: string
+        default: ''
+      life_topic:
+        description: '生活主題（留空則隨機）'
+        required: false
+        type: string
+        default: ''
 
 jobs:
   post:
@@ -38,4 +67,11 @@ jobs:
           GITHUB_USERNAME: ${{ secrets.TARGET_USERNAME }}
           WEBSITE_REPO_NAME: ${{ secrets.TARGET_REPO_NAME }}
           MANUAL_CATEGORY: ${{ github.event.inputs.category }}
+          AI_ROLE: ${{ github.event.inputs.ai_role }}
+          WRITING_STYLE: ${{ github.event.inputs.writing_style }}
+          ARTICLE_STRUCTURE: ${{ github.event.inputs.article_structure }}
+          PLANT_TOPIC: ${{ github.event.inputs.plant_topic }}
+          SUSTAIN_TOPIC: ${{ github.event.inputs.sustain_topic }}
+          CARBON_TOPIC: ${{ github.event.inputs.carbon_topic }}
+          LIFE_TOPIC: ${{ github.event.inputs.life_topic }}
         run: python scripts/main.py
