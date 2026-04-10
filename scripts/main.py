@@ -541,7 +541,11 @@ def generate_article():
         response.raise_for_status()
         data = response.json()
         content = data["choices"][0]["message"]["content"]
-
+         # ========== 加入這三行：清理 Markdown ==========
+            content = re.sub(r'\*\*(.+?)\*\*', r'\1', content)  # 移除 **粗體**
+            content = re.sub(r'^#{1,6}\s+', '', content, flags=re.MULTILINE)  # 移除 ## 標題
+            content = re.sub(r'\*(.+?)\*', r'\1', content)  # 移除 *斜體*
+            # =============================================   
         lines = content.strip().split("\n")
         title = lines[0].replace("#", "").strip()
         if not title:
