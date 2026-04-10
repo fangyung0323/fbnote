@@ -639,9 +639,9 @@ def save_article_as_html(title, content, category, output_dir="articles"):
             <div class="article-content">{content_html}</div>
           
             <div class="footer">
-                <br>每日一篇，與你一起成長<br>
+                <br>每日一篇，與你一起成長<br><br>
                 <div class="nav-links">
-                    <a href="index.html">← 返回文章列表</a><br>
+                    <a href="index.html">← 返回文章列表</a> &nbsp;|&nbsp;
                     <a href="../shop.html">🌱 植物選品</a> &nbsp;|&nbsp;
                     <a href="../consult.html">💚 綠色顧問</a>
                 </div>
