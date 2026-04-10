@@ -564,6 +564,7 @@ def save_article_as_html(title, content, category, output_dir="articles"):
     os.makedirs(output_dir, exist_ok=True)
     date_str = datetime.now().strftime("%Y-%m-%d")
     safe_title = title.replace(" ", "-").replace("/", "-").replace("?", "").replace("！", "")[:50]
+    safe_title = re.sub(r'^(標題|Title)[:：]\s*', '', safe_title)
     filename = f"{date_str}-{safe_title}.html"
     filepath = os.path.join(output_dir, filename)
     category_color = CATEGORY_COLORS.get(category, "#4a7c59")
