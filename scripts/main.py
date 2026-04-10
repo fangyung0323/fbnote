@@ -725,63 +725,7 @@ def generate_daily_post_index(daily_post_dir):
     with open(index_path, "w", encoding="utf-8") as f:
         f.write(index_content)
     print("📑 已更新 daily-post/index.html（含搜尋功能）")
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>蕨積每日文章</title>
-    <style>
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.6;
-            color: #2c3e2f;
-            background-color: #faf8f4;
-            padding: 2rem;
-        }}
-        .container {{ max-width: 800px; margin: 0 auto; }}
-        h1 {{ color: #2c5e2e; margin-bottom: 2rem; font-size: 2rem; }}
-        .article-list {{ list-style: none; padding: 0; }}
-        .article-item {{
-            margin: 1rem 0;
-            padding: 1.2rem;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            transition: transform 0.2s;
-        }}
-        .article-item:hover {{ transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }}
-        .article-link {{ font-size: 1.2rem; font-weight: 500; color: #4a7c59; text-decoration: none; }}
-        .article-link:hover {{ text-decoration: underline; }}
-        .article-date {{ color: #7f8c6d; font-size: 0.85rem; margin-top: 0.5rem; }}
-        .bottom-nav {{
-            text-align: center;
-            margin-top: 2rem;
-            padding-top: 1rem;
-            border-top: 1px solid #e0dbd0;
-        }}
-        .bottom-nav a {{ color: #4a7c59; text-decoration: none; margin: 0 0.5rem; }}
-        .bottom-nav a:hover {{ text-decoration: underline; }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🌿 蕨積每日文章</h1>
-        <ul class="article-list">
-            {''.join([f'<li class="article-item"><a class="article-link" href="{article}">{article.replace(".html", "").replace("-", " / ")}</a><div class="article-date">📅 {article.replace(".html", "").split("-")[-1] if "-" in article else "最新"}</div></li>' for article in articles])}
-        </ul>
-        <div class="bottom-nav">
-            <a href="./shop.html">🌱 植物選品</a>
-            <span>|</span>
-            <a href="./consulting.html">💚 綠色顧問</a>
-        </div>
-    </div>
-</body>
-</html>"""
-    
-    with open(os.path.join(daily_post_dir, "index.html"), "w", encoding="utf-8") as f:
-        f.write(index_content)
-    print("📑 已更新 daily-post/index.html")
+
 
 if __name__ == "__main__":
     main()
