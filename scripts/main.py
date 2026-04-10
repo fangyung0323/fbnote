@@ -545,9 +545,11 @@ def generate_article():
         content = re.sub(r'\*\*(.+?)\*\*', r'\1', content)  # 移除 **粗體**
         content = re.sub(r'^#{1,6}\s+', '', content, flags=re.MULTILINE)  # 移除 ## 標題
         content = re.sub(r'\*(.+?)\*', r'\1', content)  # 移除 *斜體*
+        
             # =============================================   
         lines = content.strip().split("\n")
         title = lines[0].replace("#", "").strip()
+        title = re.sub(r'^(標題|Title)[:：]\s*', '', title)
         if not title:
             title = f"{category}｜{subtopic[:20]}"
 
