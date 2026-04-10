@@ -636,8 +636,15 @@ def save_article_as_html(title, content, category, output_dir="articles"):
             <h1 class="article-title">{title}</h1>
             <div class="article-date">📅 {datetime.now().strftime("%Y年%m月%d日")}</div>
             <div class="article-content">{content_html}</div>
-            <div class="article-footer">🌿 蕨積 - 讓生活多一點綠<br>每日一篇，與你一起成長</div>
-            <a href="index.html" class="back-link">← 返回文章列表</a>
+          
+            <div class="footer">
+                🌿 蕨積 - 讓生活多一點綠<br>每日一篇，與你一起成長
+                <div class="nav-links">
+                    <a href="index.html">← 返回文章列表</a><br>
+                    <a href="../shop.html">🌱 植物選品</a> &nbsp;|&nbsp;
+                    <a href="../consult.html">💚 綠色顧問</a>
+                </div>
+            </div>
         </div>
     </main>
     {get_footer_html()}
