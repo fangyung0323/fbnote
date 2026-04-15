@@ -923,7 +923,7 @@ def generate_daily_post_index(daily_post_dir):
     with open(index_path, "w", encoding="utf-8") as f:
         f.write(index_html)
     print(f"📑 已更新 daily-post/index.html (共 {len(articles)} 篇文章)")
-    # ========== 新增：為每個分類產生獨立頁面（套用相同完整風格） ==========
+  # ========== 新增：為每個分類產生獨立頁面（套用相同完整風格，無按鈕、無側欄、最新文章只顯示1/5） ==========
     categories_list = ["植物", "永續", "碳盤查", "生活"]
     category_emojis = {"植物": "🌿", "永續": "♻️", "碳盤查": "📊", "生活": "🏡"}
     category_files = {"植物": "plant.html", "永續": "sustainability.html", "碳盤查": "carbon.html", "生活": "life.html"}
@@ -949,20 +949,31 @@ def generate_daily_post_index(daily_post_dir):
         # 分類頁面的最新文章（該分類的第一篇）
         cat_latest = cat_articles[0] if cat_articles else None
         
+        # 最新文章內容：只顯示前 1/5（約前 300 字）
         if cat_latest:
             cat_latest_cat_color = CATEGORY_COLORS.get(cat_latest['category'], "#6c757d")
+            # 擷取內容的前 1/5（約 300 字）
+            full_content = cat_latest.get('content', '')
+            # 移除 HTML 標籤，只取純文字
+            plain_content = re.sub(r'<[^>]+>', '', full_content)
+            # 取前 300 字
+            preview_length = min(300, len(plain_content))
+            preview_content = plain_content[:preview_length]
+            if len(plain_content) > preview_length:
+                preview_content += "..."
+            
             cat_latest_html = f"""
                     <div class="latest-article">
                         <div class="latest-category" style="background: {cat_latest_cat_color};">📌 {cat_latest['category']}</div>
                         <h1 class="latest-title">{cat_latest['title']}</h1>
                         <div class="latest-date">📅 {cat_latest['date']}</div>
-                        <div class="latest-content">{cat_latest['content']}</div>
-                        <a href="{cat_latest['filename']}" class="read-more">🔗 查看獨立頁面 →</a>
+                        <div class="latest-content">{preview_content}</div>
+                        <a href="{cat_latest['filename']}" class="read-more">🔗 閱讀全文 →</a>
                     </div>"""
         else:
             cat_latest_html = '<div style="text-align:center;padding:40px;color:var(--stone);">📭 此分類尚無文章</div>'
         
-        # 產生分類獨立頁面（完整複製 index.html 的結構）
+        # 產生分類獨立頁面（無按鈕、無側欄、最新文章只顯示摘要）
         cat_page_html = f"""<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -978,30 +989,8 @@ def generate_daily_post_index(daily_post_dir):
     .page-header h1 {{ color: var(--moss); font-size: 2rem; font-family: 'Noto Serif TC', serif; }}
     .page-header p {{ color: var(--stone); margin-top: 0.5rem; }}
     
-    .categories {{
-        display: flex;
-        justify-content: center;
-        gap: 1rem;
-        flex-wrap: wrap;
-        margin-bottom: 2rem;
-    }}
-    .category-btn {{
-        padding: 0.5rem 1.5rem;
-        border-radius: 30px;
-        border: none;
-        cursor: pointer;
-        font-size: 0.9rem;
-        font-weight: 500;
-        transition: transform 0.2s;
-        background: #e8e0d8;
-        color: #4a5b4e;
-    }}
-    .category-btn:hover {{ transform: translateY(-2px); }}
-    .category-btn.active {{ background: #4a7c59; color: white; }}
-    
     .two-columns {{ display: flex; gap: 2rem; flex-wrap: wrap; }}
     .main-col {{ flex: 3; min-width: 250px; }}
-    .sidebar-col {{ flex: 1; min-width: 200px; background: white; border-radius: 16px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: fit-content; }}
     
     .latest-article {{
         background: white;
@@ -1048,11 +1037,6 @@ def generate_daily_post_index(daily_post_dir):
                 <p>蕨積每日文章 - {cat}分類精選</p>
             </div>
             
-            <div class="categories">
-                <button class="category-btn" data-category="all" onclick="location.href='index.html';">📋 全部</button>
-                <button class="category-btn active" data-category="{cat}">{category_emojis[cat]} {cat}</button>
-            </div>
-            
             <div class="two-columns">
                 <div class="main-col">
                     {cat_latest_html}
@@ -1061,11 +1045,6 @@ def generate_daily_post_index(daily_post_dir):
                     <ul class="past-list">
                         {cat_past_list_html}
                     </ul>
-                </div>
-                
-                <div class="sidebar-col">
-                    <div class="section-title">📚 歷史歸檔</div>
-                    <p style="color: var(--stone); font-size: 0.85rem;">此分類共 {len(cat_articles)} 篇文章</p>
                 </div>
             </div>
         </div>
@@ -1082,7 +1061,8 @@ def generate_daily_post_index(daily_post_dir):
         cat_filepath = os.path.join(daily_post_dir, category_files[cat])
         with open(cat_filepath, "w", encoding="utf-8") as f:
             f.write(cat_page_html)
-        print(f"📁 已產生分類頁面：{category_files[cat]}（完整風格）")
+        print(f"📁 已產生分類頁面：{category_files[cat]}（無按鈕、無側欄、摘要模式）")===== 新增：為每個分類產生獨立頁面（套用相同完整風格） ==========
+  
 # ==================== 推送 ====================
 def commit_and_push_to_website():
     print("=" * 50)
