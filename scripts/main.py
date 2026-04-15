@@ -923,16 +923,14 @@ def generate_daily_post_index(daily_post_dir):
     with open(index_path, "w", encoding="utf-8") as f:
         f.write(index_html)
     print(f"📑 已更新 daily-post/index.html (共 {len(articles)} 篇文章)")
-  # ========== 新增：為每個分類產生獨立頁面（套用相同完整風格，無按鈕、無側欄、最新文章只顯示1/5） ==========
+    # ========== 新增: 為每個分類產生獨立頁面 ==========
     categories_list = ["植物", "永續", "碳盤查", "生活"]
     category_emojis = {"植物": "🌿", "永續": "♻️", "碳盤查": "📊", "生活": "🏡"}
     category_files = {"植物": "plant.html", "永續": "sustainability.html", "碳盤查": "carbon.html", "生活": "life.html"}
     
     for cat in categories_list:
-        # 篩選該分類的文章
         cat_articles = [a for a in articles if a["category"] == cat]
         
-        # 產生該分類的過往文章列表 HTML
         cat_past_list_html = ""
         for article in cat_articles:
             cat_color = CATEGORY_COLORS.get(article["category"], "#6c757d")
@@ -946,17 +944,12 @@ def generate_daily_post_index(daily_post_dir):
         if not cat_past_list_html:
             cat_past_list_html = '<li style="color: #aaa; text-align: center;">📭 暫無文章</li>'
         
-        # 分類頁面的最新文章（該分類的第一篇）
         cat_latest = cat_articles[0] if cat_articles else None
         
-        # 最新文章內容：只顯示前 1/5（約前 300 字）
         if cat_latest:
             cat_latest_cat_color = CATEGORY_COLORS.get(cat_latest['category'], "#6c757d")
-            # 擷取內容的前 1/5（約 300 字）
             full_content = cat_latest.get('content', '')
-            # 移除 HTML 標籤，只取純文字
             plain_content = re.sub(r'<[^>]+>', '', full_content)
-            # 取前 300 字
             preview_length = min(300, len(plain_content))
             preview_content = plain_content[:preview_length]
             if len(plain_content) > preview_length:
@@ -973,7 +966,6 @@ def generate_daily_post_index(daily_post_dir):
         else:
             cat_latest_html = '<div style="text-align:center;padding:40px;color:var(--stone);">📭 此分類尚無文章</div>'
         
-        # 產生分類獨立頁面（無按鈕、無側欄、最新文章只顯示摘要）
         cat_page_html = f"""<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -1061,7 +1053,7 @@ def generate_daily_post_index(daily_post_dir):
         cat_filepath = os.path.join(daily_post_dir, category_files[cat])
         with open(cat_filepath, "w", encoding="utf-8") as f:
             f.write(cat_page_html)
-        print(f"📁 已產生分類頁面：{category_files[cat]}（無按鈕、無側欄、摘要模式）")===== 新增：為每個分類產生獨立頁面（套用相同完整風格） ==========
+        print(f"📁 已產生分類頁面：{category_files[cat]}")
   
 # ==================== 推送 ====================
 def commit_and_push_to_website():
