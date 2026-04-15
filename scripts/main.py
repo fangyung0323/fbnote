@@ -659,16 +659,14 @@ def save_article_as_html(title, content, category, output_dir="articles"):
 
 # ==================== 索引頁面生成 ====================
 def generate_daily_post_index(daily_post_dir):
-    """產生 daily-post 目錄的索引頁面，包含分類篩選，並為每個分類產生獨立頁面"""
-    import json
+    """產生 daily-post 目錄的索引頁面，並為每個分類產生獨立頁面（皆套用完整網站風格）"""
     articles = []
     for file in os.listdir(daily_post_dir):
         if file.endswith(".html") and file != "index.html":
             filepath = os.path.join(daily_post_dir, file)
             title = file.replace(".html", "").replace("-", " / ")
-            category = "生活"  # 預設
+            category = "生活"
             date_str = ""
-            # 從檔案中讀取真實標題和分類
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
                     content = f.read()
@@ -678,7 +676,6 @@ def generate_daily_post_index(daily_post_dir):
                     match_cat = re.search(r'<div class="article-category">📌 (.+?)</div>', content)
                     if match_cat:
                         category = match_cat.group(1)
-                    # 嘗試從檔名提取日期
                     match_date = re.search(r'(\d{4})-(\d{2})-(\d{2})', file)
                     if match_date:
                         date_str = f"{match_date.group(1)}/{match_date.group(2)}/{match_date.group(3)}"
@@ -691,18 +688,19 @@ def generate_daily_post_index(daily_post_dir):
                 "date": date_str
             })
     
-    # 按日期排序（最新的在前）
     articles.sort(key=lambda x: x["date"], reverse=True)
     
-    # ========== 1. 產生主索引頁面 (index.html) ==========
+    # 產生文章列表 HTML
     articles_html = ""
     for article in articles:
         articles_html += f'''
         <li class="article-item" data-category="{article['category']}">
+            <span class="article-category">{article['category']}</span>
             <a class="article-link" href="{article['filename']}">{article['title']}</a>
             <div class="article-date">📅 {article['date']}</div>
         </li>'''
     
+    # ========== 1. 產生主索引頁面 (index.html) - 完整風格 ==========
     index_html = f"""<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -750,6 +748,15 @@ def generate_daily_post_index(daily_post_dir):
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }}
+        .article-category {{
+            display: inline-block;
+            font-size: 0.7rem;
+            color: #4a7c59;
+            background: #e8f0e6;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            margin-bottom: 0.5rem;
+        }}
         .article-link {{
             font-size: 1.1rem;
             color: #4a7c59;
@@ -787,13 +794,11 @@ def generate_daily_post_index(daily_post_dir):
     <script>
         const filterBtns = document.querySelectorAll('.filter-btn');
         const articles = document.querySelectorAll('.article-item');
-        
         filterBtns.forEach(btn => {{
             btn.addEventListener('click', () => {{
                 const category = btn.getAttribute('data-category');
                 filterBtns.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                
                 articles.forEach(article => {{
                     if (category === 'all' || article.getAttribute('data-category') === category) {{
                         article.style.display = '';
@@ -809,9 +814,9 @@ def generate_daily_post_index(daily_post_dir):
     
     with open(os.path.join(daily_post_dir, "index.html"), "w", encoding="utf-8") as f:
         f.write(index_html)
-    print("📑 已更新 daily-post/index.html")
+    print("📑 已更新 daily-post/index.html（完整風格）")
     
-    # ========== 2. 為每個分類產生獨立頁面 ==========
+    # ========== 2. 為每個分類產生獨立頁面（相同完整風格） ==========
     categories = ["植物", "永續", "碳盤查", "生活"]
     category_emojis = {"植物": "🌱", "永續": "♻️", "碳盤查": "📊", "生活": "🏡"}
     category_files = {"植物": "plant.html", "永續": "sustainability.html", "碳盤查": "carbon.html", "生活": "life.html"}
@@ -822,6 +827,7 @@ def generate_daily_post_index(daily_post_dir):
         for article in cat_articles:
             cat_articles_html += f'''
         <li class="article-item">
+            <span class="article-category">{article['category']}</span>
             <a class="article-link" href="{article['filename']}">{article['title']}</a>
             <div class="article-date">📅 {article['date']}</div>
         </li>'''
@@ -858,6 +864,15 @@ def generate_daily_post_index(daily_post_dir):
             background: white;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }}
+        .article-category {{
+            display: inline-block;
+            font-size: 0.7rem;
+            color: #4a7c59;
+            background: #e8f0e6;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            margin-bottom: 0.5rem;
         }}
         .article-link {{
             font-size: 1.1rem;
@@ -898,7 +913,7 @@ def generate_daily_post_index(daily_post_dir):
         cat_filepath = os.path.join(daily_post_dir, category_files[cat])
         with open(cat_filepath, "w", encoding="utf-8") as f:
             f.write(cat_page_html)
-        print(f"📁 已產生分類頁面：{category_files[cat]}")
+        print(f"📁 已產生分類頁面：{category_files[cat]}（完整風格）")
 
 # ==================== 推送 ====================
 def commit_and_push_to_website():
