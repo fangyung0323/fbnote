@@ -394,7 +394,7 @@ def get_footer_html():
     return """<footer>
     <ul class="footer-links">
       <li><a href="/shop.html">植物選品</a></li>
-      <li><a href="/consult.html">綠色顧問</a></li>
+      <li><a href="/consult.html">綠色服務</a></li>
       <li><a href="/fbnote.html">蕨望筆記</a></li>
       <li><a href="/about.html">關於蕨積</a></li>
     </ul>
@@ -654,7 +654,7 @@ def save_article_as_html(title, content, category, output_dir="articles"):
                     <a href="index.html">← 返回所有文章</a> &nbsp;|&nbsp;
                     <a href="{category_page}">← 返回{category}分類</a> &nbsp;|&nbsp;
                     <a href="../shop.html">🌱 植物選品</a> &nbsp;|&nbsp;
-                    <a href="../consult.html">💚 綠色顧問</a>
+                    <a href="../consult.html">💚 綠色服務</a>
                 </div>
             </div>
         </div>
