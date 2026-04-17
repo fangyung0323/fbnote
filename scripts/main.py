@@ -862,10 +862,10 @@ def generate_daily_post_index(daily_post_dir):
             
            <div class="categories">
 
-    <a href="plant.html" class="category-btn">🌿 植物</a>
-    <a href="sustainability.html" class="category-btn">♻️ 永續</a>
-    <a href="carbon.html" class="category-btn">📊 碳盤查</a>
-    <a href="life.html" class="category-btn">🏡 生活</a>
+    <a href="plant.html" class="category-btn" style="text-decoration: none;" >🌿 植物</a>
+    <a href="sustainability.html" class="category-btn" style="text-decoration: none;" >♻️ 永續</a>
+    <a href="carbon.html" class="category-btn"style="text-decoration: none;"  >📊 碳盤查</a>
+    <a href="life.html" class="category-btn"style="text-decoration: none;"  >🏡 生活</a>
 </div>
             
             <div class="two-columns">
