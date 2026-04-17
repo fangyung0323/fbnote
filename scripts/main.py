@@ -860,13 +860,13 @@ def generate_daily_post_index(daily_post_dir):
                 <p>植物・永續・碳盤查・生活 — 每天一篇，與你一起成長</p>
             </div>
             
-            <div class="categories">
-                <button class="category-btn active" data-category="all">📋 全部</button>
-                <button class="category-btn" data-category="植物">🌿 植物</button>
-                <button class="category-btn" data-category="永續">♻️ 永續</button>
-                <button class="category-btn" data-category="碳盤查">📊 碳盤查</button>
-                <button class="category-btn" data-category="生活">🏡 生活</button>
-            </div>
+           <div class="categories">
+
+    <a href="plant.html" class="category-btn">🌿 植物</a>
+    <a href="sustainability.html" class="category-btn">♻️ 永續</a>
+    <a href="carbon.html" class="category-btn">📊 碳盤查</a>
+    <a href="life.html" class="category-btn">🏡 生活</a>
+</div>
             
             <div class="two-columns">
                 <div class="main-col">
