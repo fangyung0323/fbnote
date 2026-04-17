@@ -651,8 +651,8 @@ def save_article_as_html(title, content, category, output_dir="articles"):
             <div class="footer">
                 <br>每日一篇，與你一起成長<br><br>
                 <div class="nav-links">
-                    <a href="index.html">← 返回所有文章</a> &nbsp;|&nbsp;
-                    <a href="{category_page}">← 返回{category}分類</a> &nbsp;|&nbsp;
+                    <a href="index.html">← 返回每日文章</a> &nbsp;|&nbsp;
+                    <a href="{category_page}">← 返回{category}文章分類</a> &nbsp;|&nbsp;
                     <a href="../shop.html">🌱 植物選品</a> &nbsp;|&nbsp;
                     <a href="../consult.html">💚 綠色服務</a>
                 </div>
