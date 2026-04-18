@@ -103,7 +103,6 @@ def generate_summary(title, content):
 • 
 • 
 
-👉 完整內容：[連結]
 """
     
     try:
