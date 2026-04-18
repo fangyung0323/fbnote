@@ -157,7 +157,7 @@ def send_email(to_email, to_name, summary, article_url):
         <p>👉 <a href="{article_url}" style="color: #5a7a4a;">閱讀全文</a></p>
         <p style="color: #9a9080; font-size: 12px; margin-top: 30px;">
             每天一篇，與你一起成長 🌿<br>
-            <a href="https://www.fernbrom.com/unsubscribe.html" style="color: #9a9080;">取消訂閱</a>
+            <a href="https://www.fernbrom.com/subscribe.html" style="color: #9a9080;">取消訂閱</a>
         </p>
     </body>
     </html>
