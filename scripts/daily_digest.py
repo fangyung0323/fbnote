@@ -2,7 +2,7 @@
 """
 每日摘要寄送機器人
 - 從 Google Sheet 讀取訂閱者名單
-- 從文章 HTML 中讀取預存的摘要（不再呼叫 AI）
+- 從文章 HTML 中讀取預存的摘要（直接從 GitHub Raw 讀取，不受部署延遲影響）
 - 透過 Gmail SMTP 寄送
 """
 
@@ -46,11 +46,20 @@ def get_subscribers():
     except Exception as e:
         print(f"❌ 讀取 Google Sheet 失敗: {e}")
         return []
-     # ==================== 抓取當日最新文章摘要 ====================   
+
+# ==================== 從文章讀取摘要和重點 ====================
 def get_article_summary(article_url):
-    """從文章 HTML 中讀取預存的摘要和重點"""
+    """從文章 HTML 中讀取預存的摘要和重點（自動轉換為 GitHub Raw）"""
     try:
-        response = requests.get(article_url)
+        # 將網站網址轉換為 GitHub Raw 網址（避免等待 Render 部署）
+        if "fernbrom.com" in article_url:
+            filename = article_url.split('/')[-1]
+            raw_url = f"https://raw.githubusercontent.com/fangyung0323/fb/main/daily-post/{filename}"
+            print(f"📡 從 GitHub Raw 讀取: {raw_url}")
+            response = requests.get(raw_url)
+        else:
+            response = requests.get(article_url)
+        
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         
@@ -77,9 +86,10 @@ def get_article_summary(article_url):
     except Exception as e:
         print(f"❌ 讀取文章摘要失敗: {e}")
         return "無法讀取摘要", "<ul><li>無法讀取重點</li></ul>", "無標題"
+
 # ==================== 抓取當日最新文章 ====================
 def get_today_article():
-    """從 GitHub 讀取 daily-post 目錄中「今天」的最新文章"""
+    """從 GitHub API 讀取 daily-post 目錄中「今天」的最新文章"""
     try:
         url = "https://api.github.com/repos/fangyung0323/fb/contents/daily-post"
         headers = {"Accept": "application/vnd.github.v3+json"}
@@ -101,6 +111,7 @@ def get_today_article():
         today_files.sort(key=lambda x: x["name"], reverse=True)
         latest = today_files[0]
         
+        # 給訂閱者的連結（網站網址）
         article_url = f"https://www.fernbrom.com/daily-post/{latest['name']}"
         
         print(f"📰 找到今日文章: {latest['name']}")
@@ -112,6 +123,7 @@ def get_today_article():
     except Exception as e:
         print(f"❌ 抓取文章失敗: {e}")
         return None, None, None, None
+
 # ==================== 寄送 Email ====================
 def send_email(to_email, to_name, title, summary, key_points_html, article_url):
     """寄送摘要信給單一訂閱者"""
