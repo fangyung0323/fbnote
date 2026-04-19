@@ -164,27 +164,28 @@ class ArticleGenerator:
 """
         return self._call_gemini(prompt, category_info)
     
-    def _call_gemini(self, prompt: str, category_info: Dict) -> Dict:
-        """呼叫 Gemini API 並解析回傳"""
-        model = genai.GenerativeModel('gemini-1.5-flash')
+   def _call_gemini(self, prompt: str, category_info: Dict) -> Dict:
+    """呼叫 Gemini API 並解析回傳"""
+    try:
+        # 使用 gemini-pro 模型
+        model = genai.GenerativeModel('gemini-pro')
         
-        try:
-            response = model.generate_content(
-                prompt,
-                generation_config={
-                    "temperature": 0.7,
-                    "max_output_tokens": 2000,
-                }
-            )
-            
-            article_data = self._parse_json_response(response.text)
-            article_data = self._clean_markdown(article_data)
-            
-            return article_data
-            
-        except Exception as e:
-            print(f"❌ Gemini API 呼叫失敗: {e}")
-            return self._get_fallback_article(category_info)
+        response = model.generate_content(
+            prompt,
+            generation_config={
+                "temperature": 0.7,
+                "max_output_tokens": 2000,
+            }
+        )
+        
+        article_data = self._parse_json_response(response.text)
+        article_data = self._clean_markdown(article_data)
+        
+        return article_data
+        
+    except Exception as e:
+        print(f"❌ Gemini API 呼叫失敗: {e}")
+        return self._get_fallback_article(category_info)
     
     def generate(self, category_key: str, category_info: Dict) -> Dict:
         """主要生成函數：先嘗試抓新聞，沒新聞就用知識庫"""
