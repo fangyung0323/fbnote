@@ -39,7 +39,8 @@ class ArticleGenerator:
 """
         
         try:
-            model = genai.GenerativeModel('gemini-pro')
+            # 或這個格式
+            model = genai.GenerativeModel('models/gemini-1.5-pro')
             
             print("🤖 正在呼叫 Gemini API 生成文章...")
             
