@@ -560,8 +560,8 @@ def generate_article():
     except Exception as e:
         print(f"❌ API 呼叫失敗：{e}")
         return None, None, None
-
-def save_article_as_html(title, content, category, output_dir="articles"):
+def save_article_as_html(title, content, category, summary, key_points, output_dir="articles"):
+    """儲存文章為 HTML，並將摘要存入 meta 標籤"""
     os.makedirs(output_dir, exist_ok=True)
     date_str = datetime.now().strftime("%Y-%m-%d")
     safe_title = title.replace(" ", "-").replace("/", "-").replace("?", "").replace("！", "")[:50]
@@ -570,6 +570,10 @@ def save_article_as_html(title, content, category, output_dir="articles"):
     filepath = os.path.join(output_dir, filename)
     category_color = CATEGORY_COLORS.get(category, "#4a7c59")
     content_html = content.replace("\n", "<br>")
+    
+    # 將 key_points 轉為 JSON 字串（方便讀取）
+    import json
+    key_points_json = json.dumps(key_points, ensure_ascii=False)
     
     # 分類頁面對應表
     category_page_map = {
@@ -585,6 +589,9 @@ def save_article_as_html(title, content, category, output_dir="articles"):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="{summary}">
+    <meta name="article-summary" content="{summary}">
+    <meta name="article-keypoints" content='{key_points_json}'>
     <title>{title} - 蕨積每日文章</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
@@ -619,20 +626,6 @@ def save_article_as_html(title, content, category, output_dir="articles"):
         line-height: 1.8;
         font-size: 1rem;
     }}
-    .article-footer {{
-        text-align: center;
-        margin-top: 3rem;
-        padding-top: 2rem;
-        border-top: 1px solid #e0d6cc;
-        color: var(--stone);
-        font-size: 0.9rem;
-    }}
-    .back-link {{
-        display: inline-block;
-        margin-top: 1rem;
-        color: var(--fern);
-        text-decoration: none;
-    }}
     @media (max-width: 768px) {{
         .article-title {{ font-size: 1.5rem; }}
         .article-container {{ padding: 0 1rem; }}
@@ -647,14 +640,14 @@ def save_article_as_html(title, content, category, output_dir="articles"):
             <h1 class="article-title">{title}</h1>
             <div class="article-date">📅 {datetime.now().strftime("%Y年%m月%d日")}</div>
             <div class="article-content">{content_html}</div>
-          
+            
             <div class="footer">
                 <br>每日一篇，與你一起成長<br><br>
                 <div class="nav-links">
-                    <a href="index.html">← 返回每日文章</a> &nbsp;|&nbsp;
-                    <a href="{category_page}">← 返回{category}文章分類</a> &nbsp;|&nbsp;
+                    <a href="index.html">← 返回所有文章</a> &nbsp;|&nbsp;
+                    <a href="{category_page}">← 返回{category}分類</a> &nbsp;|&nbsp;
                     <a href="../shop.html">🌱 植物選品</a> &nbsp;|&nbsp;
-                    <a href="../consult.html">💚 綠色服務</a>
+                    <a href="../consult.html">💚 綠色顧問</a>
                 </div>
             </div>
         </div>
@@ -667,6 +660,7 @@ def save_article_as_html(title, content, category, output_dir="articles"):
         f.write(html_content)
     print(f"📄 文章已儲存：{filepath}")
     return filepath
+
 
 # ==================== 索引頁面生成 ====================
 def generate_daily_post_index(daily_post_dir):
