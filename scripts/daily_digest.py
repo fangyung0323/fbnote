@@ -47,7 +47,7 @@ def get_subscribers():
         print(f"❌ 讀取 Google Sheet 失敗: {e}")
         return []
      # ==================== 抓取當日最新文章摘要 ====================   
-    def get_article_summary(article_url):
+def get_article_summary(article_url):
     """從文章 HTML 中讀取預存的摘要和重點"""
     try:
         response = requests.get(article_url)
