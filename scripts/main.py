@@ -2,8 +2,8 @@
 """
 每日自動發文機器人
 - 四大類別輪換：植物、永續、碳盤查、生活
-- 支援手動觸發時透過環境變數覆蓋預設設定（AI角色、風格、結構、各類別主題）
-- 預設主題從內建庫中隨機選擇
+- 碳盤查、永續類別會開啟聯網搜尋，根據最新新聞撰寫文章
+- 植物、生活類別使用隨機子主題庫
 - 文章保存為 HTML（套用官網模板）
 - 推送到網站倉庫的 daily-post 目錄
 - 自動生成索引頁面（外掛導覽列 + 分類篩選）
@@ -18,6 +18,7 @@ import tempfile
 import re
 from datetime import datetime
 import requests
+from article_generator import ArticleGenerator
 
 # ==================== 配置 ====================
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
@@ -31,7 +32,7 @@ CATEGORY_COLORS = {
     "生活": "#b88b4a"
 }
 
-# ==================== 子主題庫（預設） ====================
+# ==================== 子主題庫（僅供植物、生活使用） ====================
 SUB_TOPICS = {
     "植物": [
         "植生牆入門指南：打造你的第一面垂直花園",
@@ -46,30 +47,8 @@ SUB_TOPICS = {
         "植物與兒童教育：讓孩子從自然中學習",
         "辦公室植物推薦：提升工作效率的綠色夥伴"
     ],
-    "永續": [
-        "零浪費生活入門：從今天開始減少垃圾",
-        "減塑小撇步：塑膠袋之外的選擇",
-        "永續消費指南：買得更少，買得更好",
-        "如何打造低碳生活：日常減碳行動",
-        "二手衣物的第二人生：循環經濟入門",
-        "綠色能源在家應用：太陽能、風力怎麼用",
-        "永續飲食：從餐桌開始改變世界",
-        "企業永續案例：那些做對事的大公司",
-        "環保旅遊怎麼玩：低碳出遊指南",
-        "永續投資入門：用錢投票給更好的未來"
-    ],
-    "碳盤查": [
-        "什麼是碳足跡？從一杯咖啡開始算起",
-        "企業如何開始碳盤查：步驟與準備",
-        "個人碳足跡計算：算出你的隱形碳排放",
-        "碳中和是什麼？真的能讓排放歸零嗎",
-        "淨零排放趨勢：企業與國家的新目標",
-        "碳權交易基礎知識：買賣排放的市場",
-        "生活中的減碳行動：省電、省水、省碳",
-        "碳盤查常見問題：一次搞懂所有疑問",
-        "國際碳關稅對台灣的影響與因應",
-        "中小企業碳管理入門：從哪裡開始"
-    ],
+    "永續": [],  # 留空，聯網搜尋時 AI 自己決定主題
+    "碳盤查": [],  # 留空，聯網搜尋時 AI 自己決定主題
     "生活": [
         "斷捨離實踐指南：告別雜物，迎接清爽",
         "正念練習入門：專注當下的簡單方法",
@@ -394,7 +373,7 @@ def get_footer_html():
     return """<footer>
     <ul class="footer-links">
       <li><a href="/shop.html">植物選品</a></li>
-      <li><a href="/consult.html">綠色服務</a></li>
+      <li><a href="/consult.html">綠色顧問</a></li>
       <li><a href="/fbnote.html">蕨望筆記</a></li>
       <li><a href="/about.html">關於蕨積</a></li>
     </ul>
@@ -461,105 +440,46 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 """
 
-# ==================== 文章生成 ====================
-def generate_article():
-    """调用 DeepSeek API 生成文章内容，支援手動覆蓋設定"""
-    if not DEEPSEEK_API_KEY:
-        print("❌ 錯誤：DEEPSEEK_API_KEY 環境變數未設定")
-        return None, None, None
-
+# ==================== 文章生成（使用 ArticleGenerator） ====================
+def generate_article_with_ai():
+    """使用 ArticleGenerator 類別生成文章"""
     category = get_today_category()
-    custom = get_custom_config()
-
-    # 決定角色
-    if custom["role"]:
-        role_prompt = f"你是一位{custom['role']}，擅長撰寫有趣且專業的文章。"
-        print(f"🎭 手動角色：{custom['role']}")
-    else:
-        role_prompt = DEFAULT_ROLES.get(category, "你是一位科普作家。")
-        print(f"🎭 預設角色（{category}）")
-
-    # 決定子主題
-    if custom["topics"].get(category):
-        subtopic = custom["topics"][category]
-        print(f"🌱 手動主題：{subtopic}")
-    else:
-        subtopic = random.choice(SUB_TOPICS.get(category, ["一般主題"]))
+    
+    # 準備 category_info
+    category_emojis = {"植物": "🌱", "永續": "♻️", "碳盤查": "📊", "生活": "🏡"}
+    category_prompts = {
+        "植物": "請撰寫一篇關於植物的文章，內容可包含植物知識、養護技巧、生態價值等。文章需親切易懂。",
+        "永續": "請撰寫一篇關於永續發展的文章，可涵蓋環保生活、循環經濟、永續趨勢等。內容積極正面，具啟發性。",
+        "碳盤查": "請撰寫一篇關於碳盤查的文章，介紹碳足跡計算、企業減碳方法或相關政策。需專業但不過於艱澀。",
+        "生活": "請撰寫一篇生活風格文章，可談及日常美學、慢生活、心靈成長等。風格輕鬆溫暖。"
+    }
+    category_tags = {
+        "植物": ["植物", "園藝", "生態"],
+        "永續": ["永續", "環保", "綠色生活"],
+        "碳盤查": ["碳盤查", "碳中和", "ESG"],
+        "生活": ["生活", "美學", "心靈"]
+    }
+    
+    category_info = {
+        "name": category,
+        "emoji": category_emojis.get(category, "📝"),
+        "prompt": category_prompts.get(category, ""),
+        "tags": category_tags.get(category, [])
+    }
+    
+    # 取得子主題（如果是植物或生活，隨機挑選）
+    if category in ["植物", "生活"] and SUB_TOPICS.get(category):
+        subtopic = random.choice(SUB_TOPICS[category])
+        category_info["prompt"] = f"{category_info['prompt']}\n\n今天的主題是：{subtopic}"
         print(f"🌱 隨機主題：{subtopic}")
+    
+    # 使用 ArticleGenerator
+    article_gen = ArticleGenerator(DEEPSEEK_API_KEY)
+    article = article_gen.generate(category.lower(), category_info)
+    
+    return article
 
-    # 決定寫作風格
-    if custom["style"]:
-        style = custom["style"]
-        print(f"✍️ 手動風格：{style}")
-    else:
-        style = random.choice(DEFAULT_STYLES)
-        print(f"✍️ 隨機風格：{style}")
-
-    # 決定文章結構
-    if custom["structure"]:
-        structure = custom["structure"]
-        print(f"📐 手動結構：{structure}")
-    else:
-        structure = random.choice(DEFAULT_STRUCTURES)
-        print(f"📐 隨機結構：{structure}")
-
-    # 組合提示詞
-    prompt = f"""請寫一篇關於「{category}」的科普或生活文章。
-
-今天的主題是：{subtopic}
-
-寫作風格：{style}
-
-文章結構：{structure}
-
-要求：
-1. 標題要吸引人，從主題延伸
-2. 內容約 500-800 字
-3. 語言使用繁體中文
-4. 結尾加上「🌿 蕨積 - 讓生活多一點綠」
-5. 避免與之前文章內容重複，請用新的角度切入
-
-請直接輸出文章內容，不需要額外說明。"""
-
-    headers = {
-        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    payload = {
-        "model": "deepseek-chat",
-        "messages": [
-            {"role": "system", "content": role_prompt},
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": 0.85,
-        "max_tokens": 1500
-    }
-
-    print("🤖 正在呼叫 DeepSeek API 生成文章...")
-    try:
-        response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=60)
-        response.raise_for_status()
-        data = response.json()
-        content = data["choices"][0]["message"]["content"]
-         # ========== 加入這三行：清理 Markdown ==========
-        content = re.sub(r'\*\*(.+?)\*\*', r'\1', content)  # 移除 **粗體**
-        content = re.sub(r'^#{1,6}\s+', '', content, flags=re.MULTILINE)  # 移除 ## 標題
-        content = re.sub(r'\*(.+?)\*', r'\1', content)  # 移除 *斜體*
-        
-            # =============================================   
-        lines = content.strip().split("\n")
-        title = lines[0].replace("#", "").strip()
-        title = re.sub(r'^(標題|Title)[:：]\s*', '', title)
-        if not title:
-            title = f"{category}｜{subtopic[:20]}"
-
-        print(f"✅ 文章生成成功：{title}")
-        print(f"📂 類別：{category}")
-        return title, content, category
-    except Exception as e:
-        print(f"❌ API 呼叫失敗：{e}")
-        return None, None, None
+# ==================== 儲存文章 ====================
 def save_article_as_html(title, content, category, summary, key_points, output_dir="articles"):
     """儲存文章為 HTML，並將摘要存入 meta 標籤"""
     os.makedirs(output_dir, exist_ok=True)
@@ -571,7 +491,7 @@ def save_article_as_html(title, content, category, summary, key_points, output_d
     category_color = CATEGORY_COLORS.get(category, "#4a7c59")
     content_html = content.replace("\n", "<br>")
     
-    # 將 key_points 轉為 JSON 字串（方便讀取）
+    # 將 key_points 轉為 JSON 字串
     import json
     key_points_json = json.dumps(key_points, ensure_ascii=False)
     
@@ -660,7 +580,6 @@ def save_article_as_html(title, content, category, summary, key_points, output_d
         f.write(html_content)
     print(f"📄 文章已儲存：{filepath}")
     return filepath
-
 
 # ==================== 索引頁面生成 ====================
 def generate_daily_post_index(daily_post_dir):
@@ -853,14 +772,14 @@ def generate_daily_post_index(daily_post_dir):
                 <h1>🌿 蕨積每日文章</h1>
                 <p>植物・永續・碳盤查・生活 — 每天一篇，與你一起成長</p>
             </div>
-            
-           <div class="categories">
+               <div class="categories">
 
     <a href="plant.html" class="category-btn" style="text-decoration: none;" >🌿 植物</a>
     <a href="sustainability.html" class="category-btn" style="text-decoration: none;" >♻️ 永續</a>
     <a href="carbon.html" class="category-btn"style="text-decoration: none;"  >📊 碳盤查</a>
     <a href="life.html" class="category-btn"style="text-decoration: none;"  >🏡 生活</a>
 </div>
+           
             
             <div class="two-columns">
                 <div class="main-col">
@@ -928,6 +847,7 @@ def generate_daily_post_index(daily_post_dir):
     with open(index_path, "w", encoding="utf-8") as f:
         f.write(index_html)
     print(f"📑 已更新 daily-post/index.html (共 {len(articles)} 篇文章)")
+    
     # ========== 新增: 為每個分類產生獨立頁面 ==========
     categories_list = ["植物", "永續", "碳盤查", "生活"]
     category_emojis = {"植物": "🌿", "永續": "♻️", "碳盤查": "📊", "生活": "🏡"}
@@ -1059,12 +979,12 @@ def generate_daily_post_index(daily_post_dir):
         with open(cat_filepath, "w", encoding="utf-8") as f:
             f.write(cat_page_html)
         print(f"📁 已產生分類頁面：{category_files[cat]}")
-  
+
 # ==================== 推送 ====================
 def commit_and_push_to_website():
     print("=" * 50)
     print("開始推送到網站倉庫...")
-    username = os.getenv("GITHUB_USERNAME", "isa930323-jpg")
+    username = os.getenv("GITHUB_USERNAME", "fangyung0323")
     token = os.getenv("GH_TOKEN")
     repo_name = os.getenv("WEBSITE_REPO_NAME", "fb")
     print(f"📌 用戶名: {username}")
@@ -1101,15 +1021,38 @@ def commit_and_push_to_website():
         else:
             print("📭 沒有新的變更需要推送")
 
+# ==================== 主程式 ====================
 def main():
     print("=" * 50)
     print("🌿 蕨積每日發文機器人啟動")
     print(f"執行時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    title, content, cat = generate_article()
-    if not title:
+    
+    # 使用新的 AI 生成函數
+    article = generate_article_with_ai()
+    if not article or not article.get("title"):
+        print("❌ 文章生成失敗")
         sys.exit(1)
-    save_article_as_html(title, content, cat)
+    
+    title = article.get("title")
+    content = article.get("content")
+    category = article.get("category")
+    summary = article.get("summary", "")
+    key_points = article.get("key_points", [])
+    
+    print(f"✅ 文章生成成功：{title}")
+    print(f"📂 類別：{category}")
+    
+    # 生成圖片（可選，如果沒有圖片生成功能可跳過）
+    # image_gen = ImageGenerator(deepseek_key)
+    # image_path = image_gen.generate(category_info["image_prompt"], category.lower())
+    
+    # 儲存文章
+    html_path = save_article_as_html(title, content, category, summary, key_points)
+    print(f"📄 文章已儲存：{html_path}")
+    
+    # 推送到網站
     commit_and_push_to_website()
+    
     print("🎉 每日發文流程完成")
 
 if __name__ == "__main__":
