@@ -2,8 +2,7 @@
 """
 每日摘要寄送機器人
 - 從 Google Sheet 讀取訂閱者名單
-- 抓取當日最新文章
-- 用 DeepSeek 產生摘要
+- 從文章 HTML 中讀取預存的摘要（不再呼叫 AI）
 - 透過 Gmail SMTP 寄送
 """
 
@@ -19,7 +18,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 # ==================== 讀取環境變數 ====================
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")  # 保留以備用
 SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
 GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
@@ -66,71 +65,49 @@ def get_today_article():
         html_files.sort(key=lambda x: x["name"], reverse=True)
         latest = html_files[0]
         
-        raw_url = latest["download_url"]
-        html_content = requests.get(raw_url).text
-        soup = BeautifulSoup(html_content, 'html.parser')
+        article_url = f"https://www.fernbrom.com/daily-post/{latest['name']}"
         
-        title = soup.find('h1').text if soup.find('h1') else "無標題"
-        content = soup.find('div', class_='article-content').text if soup.find('div', class_='article-content') else ""
+        # 從文章 HTML 中讀取摘要和重點
+        summary, key_points_html, title = get_article_summary(article_url)
         
-        print(f"📝 今日文章：{title}")
-        return title, content, latest["name"]
+        return title, summary, key_points_html, article_url
     except Exception as e:
         print(f"❌ 抓取文章失敗: {e}")
-        return None, None, None
+        return None, None, None, None
 
-# ==================== 使用 DeepSeek 產生摘要 ====================
-def generate_summary(title, content):
-    """使用 DeepSeek API 產生文章摘要"""
-    if not DEEPSEEK_API_KEY:
-        print("❌ 錯誤：DEEPSEEK_API_KEY 未設定")
-        return None
-    
-    prompt = f"""
-請為以下這篇文章產生一份簡潔的摘要，適合放在 Email 中寄送給訂閱者。
-
-文章標題：{title}
-
-文章內容：
-{content[:2000]}
-
-請用以下格式輸出，不要有多餘的說明：
-
-📌（30字內）
-
-✨ 重點整理：
-• 
-• 
-• 
-
-"""
-    
+def get_article_summary(article_url):
+    """從文章 HTML 中讀取預存的摘要和重點"""
     try:
-        response = requests.post(
-            "https://api.deepseek.com/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "deepseek-chat",
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.7,
-                "max_tokens": 500
-            },
-            timeout=60
-        )
+        response = requests.get(article_url)
         response.raise_for_status()
-        result = response.json()
-        summary = result["choices"][0]["message"]["content"]
-        print("✅ 摘要產生完成")
-        return summary
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # 讀取標題
+        title_tag = soup.find('h1', class_='article-title')
+        title = title_tag.text if title_tag else "無標題"
+        
+        # 從 meta 標籤讀取摘要
+        summary_meta = soup.find('meta', {'name': 'article-summary'})
+        summary = summary_meta['content'] if summary_meta else "無法讀取摘要"
+        
+        # 從 meta 標籤讀取重點
+        keypoints_meta = soup.find('meta', {'name': 'article-keypoints'})
+        if keypoints_meta:
+            try:
+                key_points = json.loads(keypoints_meta['content'])
+                key_points_html = "<ul>" + "".join([f"<li>{point}</li>" for point in key_points]) + "</ul>"
+            except:
+                key_points_html = "<ul><li>無法讀取重點</li></ul>"
+        else:
+            key_points_html = "<ul><li>無法讀取重點</li></ul>"
+        
+        return summary, key_points_html, title
     except Exception as e:
-        print(f"❌ 產生摘要失敗: {e}")
-        return None
+        print(f"❌ 讀取文章摘要失敗: {e}")
+        return "無法讀取摘要", "<ul><li>無法讀取重點</li></ul>", "無標題"
 
 # ==================== 寄送 Email ====================
-def send_email(to_email, to_name, summary, article_url):
+def send_email(to_email, to_name, title, summary, key_points_html, article_url):
     """寄送摘要信給單一訂閱者"""
     if not SENDER_EMAIL or not SENDER_PASSWORD:
         print("❌ 錯誤：寄信設定未完成")
@@ -138,9 +115,6 @@ def send_email(to_email, to_name, summary, article_url):
     
     today = datetime.now().strftime("%Y/%m/%d")
     subject = f"🌿 蕨積每日摘要 - {today}"
-    
-    # 將摘要中的換行轉為 HTML
-    summary_html = summary.replace("\n", "<br>") if summary else "無法產生摘要，請直接點擊連結閱讀全文。"
     
     html_content = f"""
     <!DOCTYPE html>
@@ -151,10 +125,12 @@ def send_email(to_email, to_name, summary, article_url):
         <p>這是今天的蕨積每日摘要：</p>
         <hr style="border-color: #d4e4c8;">
         <div style="background: #faf8f4; padding: 16px; border-radius: 12px;">
-            {summary_html}
+            <p><strong>📌</strong> {summary}</p>
+            <p><strong>✨ 重點整理：</strong></p>
+            {key_points_html}
+            <p><strong>👉 完整內容：</strong> <a href="{article_url}" style="color: #5a7a4a;">閱讀全文</a></p>
         </div>
         <hr style="border-color: #d4e4c8;">
-        <p>👉 <a href="{article_url}" style="color: #5a7a4a;">閱讀全文</a></p>
         <p style="color: #9a9080; font-size: 12px; margin-top: 30px;">
             每天一篇，與你一起成長 🌿<br>
             <a href="https://www.fernbrom.com/subscribe.html" style="color: #9a9080;">取消訂閱</a>
@@ -190,21 +166,16 @@ def main():
         print("⚠️ 沒有訂閱者，結束程式")
         return
     
-    # 2. 抓取當日文章
-    title, content, filename = get_today_article()
+    # 2. 抓取當日文章摘要
+    title, summary, key_points_html, article_url = get_today_article()
     if not title:
         print("❌ 無法取得文章，結束程式")
         return
     
-    article_url = f"https://www.fernbrom.com/daily-post/{filename}"
+    print(f"📝 今日文章：{title}")
+    print(f"📋 摘要：{summary}")
     
-    # 3. 產生摘要
-    summary = generate_summary(title, content)
-    if not summary:
-        print("⚠️ 摘要產生失敗，將使用預設內容")
-        summary = f"今日文章：{title}\n\n請點擊下方連結閱讀全文。"
-    
-    # 4. 寄送給所有訂閱者
+    # 3. 寄送給所有訂閱者
     success_count = 0
     for sub in subscribers:
         name = sub.get("姓名", "讀者")
@@ -212,7 +183,7 @@ def main():
         if not email:
             continue
         
-        if send_email(email, name, summary, article_url):
+        if send_email(email, name, title, summary, key_points_html, article_url):
             success_count += 1
             print(f"✅ 已寄送給 {name} ({email})")
         else:
