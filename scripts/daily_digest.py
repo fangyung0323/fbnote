@@ -140,13 +140,13 @@ def send_email(to_email, to_name, title, summary, key_points_html, article_url):
     <head><meta charset="UTF-8"></head>
     <body style="font-family: 'Noto Sans TC', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #2c3e2f;">
         <h2 style="color: #3d5a38;">🌿 {to_name} 您好，</h2>
-        <p>這是今天的蕨積每日摘要：</p>
+        <p>蕨積|每日摘要：</p>
         <hr style="border-color: #d4e4c8;">
         <div style="background: #faf8f4; padding: 16px; border-radius: 12px;">
             <p><strong>📌</strong> {summary}</p>
-            <p><strong>✨ 重點整理：</strong></p>
+            <p><strong>✨</strong></p>
             {key_points_html}
-            <p><strong>👉 完整內容：</strong> <a href="{article_url}" style="color: #5a7a4a;">閱讀全文</a></p>
+            <p><strong>👉</strong> <a href="https://www.fernbrom.com/daily-post/" style="color: #5a7a4a;">閱讀更多</a></p>
         </div>
         <hr style="border-color: #d4e4c8;">
         <p style="color: #9a9080; font-size: 12px; margin-top: 30px;">
