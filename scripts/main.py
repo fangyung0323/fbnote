@@ -21,8 +21,8 @@ import requests
 from article_generator import ArticleGenerator
 
 # ==================== 配置 ====================
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
-DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+# DeepSeek 相關設定可以保留或刪除，但不會再使用
 
 CATEGORIES = ["植物", "永續", "碳盤查", "生活"]
 CATEGORY_COLORS = {
@@ -474,7 +474,7 @@ def generate_article_with_ai():
         print(f"🌱 隨機主題：{subtopic}")
     
     # 使用 ArticleGenerator
-    article_gen = ArticleGenerator(DEEPSEEK_API_KEY)
+    article_gen = ArticleGenerator(GEMINI_API_KEY)
     article = article_gen.generate(category.lower(), category_info)
     
     return article
