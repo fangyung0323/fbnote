@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 """
 每日自動發文機器人
@@ -17,6 +16,7 @@ import subprocess
 import shutil
 import tempfile
 import re
+import json
 from datetime import datetime
 import requests
 
@@ -464,10 +464,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
 # ==================== 文章生成 ====================
 def generate_article():
-    """调用 DeepSeek API 生成文章内容，支援手動覆蓋設定"""
+    """调用 DeepSeek API 生成文章内容，回傳 dict 包含 title, content, category, summary, key_points"""
     if not DEEPSEEK_API_KEY:
         print("❌ 錯誤：DEEPSEEK_API_KEY 環境變數未設定")
-        return None, None, None
+        return None
 
     category = get_today_category()
     custom = get_custom_config()
@@ -504,7 +504,7 @@ def generate_article():
         structure = random.choice(DEFAULT_STRUCTURES)
         print(f"📐 隨機結構：{structure}")
 
-    # 組合提示詞
+    # 組合提示詞（要求輸出 JSON）
     prompt = f"""請寫一篇關於「{category}」的科普或生活文章。
 
 今天的主題是：{subtopic}
@@ -513,14 +513,19 @@ def generate_article():
 
 文章結構：{structure}
 
-要求：
-1. 標題要吸引人，從主題延伸
-2. 內容約 500-800 字
-3. 語言使用繁體中文
-4. 結尾加上「🌿 蕨積 - 讓生活多一點綠」
-5. 避免與之前文章內容重複，請用新的角度切入
+【重要】請以 JSON 格式輸出，包含以下欄位：
+- title: 文章標題（15字以內）
+- summary: 一句話總結（30字以內）
+- key_points: 三個重點，格式為 ["重點一", "重點二", "重點三"]
+- content: 文章內文（使用 HTML 格式，包含 <h2>、<p> 標籤）
 
-請直接輸出文章內容，不需要額外說明。"""
+要求：
+1. 文章長度約 500-800 字
+2. 語言使用繁體中文
+3. 結尾加上「🌿 蕨積 - 讓生活多一點綠」
+4. 不要使用 Markdown 語法（不要用 **、##、*）
+5. 不要輸出 JSON 以外的任何文字
+"""
 
     headers = {
         "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
@@ -533,8 +538,9 @@ def generate_article():
             {"role": "system", "content": role_prompt},
             {"role": "user", "content": prompt}
         ],
-        "temperature": 0.85,
-        "max_tokens": 1500
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "response_format": {"type": "json_object"}
     }
 
     print("🤖 正在呼叫 DeepSeek API 生成文章...")
@@ -542,27 +548,38 @@ def generate_article():
         response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=60)
         response.raise_for_status()
         data = response.json()
-        content = data["choices"][0]["message"]["content"]
-         # ========== 加入這三行：清理 Markdown ==========
-        content = re.sub(r'\*\*(.+?)\*\*', r'\1', content)  # 移除 **粗體**
-        content = re.sub(r'^#{1,6}\s+', '', content, flags=re.MULTILINE)  # 移除 ## 標題
-        content = re.sub(r'\*(.+?)\*', r'\1', content)  # 移除 *斜體*
         
-            # =============================================   
-        lines = content.strip().split("\n")
-        title = lines[0].replace("#", "").strip()
-        title = re.sub(r'^(標題|Title)[:：]\s*', '', title)
+        # 解析 JSON 回應
+        article_data = json.loads(data["choices"][0]["message"]["content"])
+        
+        title = article_data.get("title", "")
+        summary = article_data.get("summary", "")
+        key_points = article_data.get("key_points", [])
+        content = article_data.get("content", "")
+        
+        # 清理可能殘留的 Markdown
+        content = re.sub(r'\*\*(.+?)\*\*', r'\1', content)
+        content = re.sub(r'^#{1,6}\s+', '', content, flags=re.MULTILINE)
+        
         if not title:
             title = f"{category}｜{subtopic[:20]}"
 
         print(f"✅ 文章生成成功：{title}")
         print(f"📂 類別：{category}")
-        return title, content, category
+        
+        return {
+            "title": title,
+            "content": content,
+            "category": category,
+            "summary": summary,
+            "key_points": key_points
+        }
     except Exception as e:
         print(f"❌ API 呼叫失敗：{e}")
-        return None, None, None
+        return None
 
-def save_article_as_html(title, content, category, output_dir="articles"):
+# ==================== 儲存文章 ====================
+def save_article_as_html(title, content, category, summary, key_points, output_dir="articles"):
     os.makedirs(output_dir, exist_ok=True)
     date_str = datetime.now().strftime("%Y-%m-%d")
     safe_title = title.replace(" ", "-").replace("/", "-").replace("?", "").replace("！", "")[:50]
@@ -571,6 +588,9 @@ def save_article_as_html(title, content, category, output_dir="articles"):
     filepath = os.path.join(output_dir, filename)
     category_color = CATEGORY_COLORS.get(category, "#4a7c59")
     content_html = content.replace("\n", "<br>")
+    
+    # 將 key_points 轉為 JSON 字串
+    key_points_json = json.dumps(key_points, ensure_ascii=False)
     
     # 分類頁面對應表
     category_page_map = {
@@ -586,6 +606,9 @@ def save_article_as_html(title, content, category, output_dir="articles"):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="{summary}">
+    <meta name="article-summary" content="{summary}">
+    <meta name="article-keypoints" content='{key_points_json}'>
     <title>{title} - 蕨積每日文章</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
@@ -619,20 +642,6 @@ def save_article_as_html(title, content, category, output_dir="articles"):
     .article-content {{
         line-height: 1.8;
         font-size: 1rem;
-    }}
-    .article-footer {{
-        text-align: center;
-        margin-top: 3rem;
-        padding-top: 2rem;
-        border-top: 1px solid #e0d6cc;
-        color: var(--stone);
-        font-size: 0.9rem;
-    }}
-    .back-link {{
-        display: inline-block;
-        margin-top: 1rem;
-        color: var(--fern);
-        text-decoration: none;
     }}
     @media (max-width: 768px) {{
         .article-title {{ font-size: 1.5rem; }}
@@ -861,13 +870,12 @@ def generate_daily_post_index(daily_post_dir):
                 <p>植物・永續・碳盤查・生活 — 每天一篇，與你一起成長</p>
             </div>
             
-           <div class="categories">
-
-    <a href="plant.html" class="category-btn" style="text-decoration: none;" >🌿 植物</a>
-    <a href="sustainability.html" class="category-btn" style="text-decoration: none;" >♻️ 永續</a>
-    <a href="carbon.html" class="category-btn"style="text-decoration: none;"  >📊 碳盤查</a>
-    <a href="life.html" class="category-btn"style="text-decoration: none;"  >🏡 生活</a>
-</div>
+            <div class="categories">
+                <a href="plant.html" class="category-btn" style="text-decoration: none;">🌿 植物</a>
+                <a href="sustainability.html" class="category-btn" style="text-decoration: none;">♻️ 永續</a>
+                <a href="carbon.html" class="category-btn" style="text-decoration: none;">📊 碳盤查</a>
+                <a href="life.html" class="category-btn" style="text-decoration: none;">🏡 生活</a>
+            </div>
             
             <div class="two-columns">
                 <div class="main-col">
@@ -897,36 +905,6 @@ def generate_daily_post_index(daily_post_dir):
     
     <script>
         {get_nav_script()}
-        
-        (function() {{
-            var filterBtns = document.querySelectorAll('.category-btn');
-            var pastItems = document.querySelectorAll('#pastList .past-item');
-            
-            function filterArticles() {{
-                var activeBtn = document.querySelector('.category-btn.active');
-                var category = activeBtn ? activeBtn.getAttribute('data-category') : 'all';
-                for (var i = 0; i < pastItems.length; i++) {{
-                    var item = pastItems[i];
-                    if (category === 'all' || item.getAttribute('data-category') === category) {{
-                        item.style.display = '';
-                    }} else {{
-                        item.style.display = 'none';
-                    }}
-                }}
-            }}
-            
-            for (var i = 0; i < filterBtns.length; i++) {{
-                filterBtns[i].addEventListener('click', function() {{
-                    for (var j = 0; j < filterBtns.length; j++) {{
-                        filterBtns[j].classList.remove('active');
-                    }}
-                    this.classList.add('active');
-                    filterArticles();
-                }});
-            }}
-            
-            filterArticles();
-        }})();
     </script>
 </body>
 </html>"""
@@ -935,6 +913,7 @@ def generate_daily_post_index(daily_post_dir):
     with open(index_path, "w", encoding="utf-8") as f:
         f.write(index_html)
     print(f"📑 已更新 daily-post/index.html (共 {len(articles)} 篇文章)")
+    
     # ========== 新增: 為每個分類產生獨立頁面 ==========
     categories_list = ["植物", "永續", "碳盤查", "生活"]
     category_emojis = {"植物": "🌿", "永續": "♻️", "碳盤查": "📊", "生活": "🏡"}
@@ -1108,14 +1087,24 @@ def commit_and_push_to_website():
         else:
             print("📭 沒有新的變更需要推送")
 
+# ==================== 主程式 ====================
 def main():
     print("=" * 50)
     print("🌿 蕨積每日發文機器人啟動")
     print(f"執行時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    title, content, cat = generate_article()
-    if not title:
+    
+    article = generate_article()
+    if not article or not article.get("title"):
+        print("❌ 文章生成失敗")
         sys.exit(1)
-    save_article_as_html(title, content, cat)
+    
+    title = article.get("title")
+    content = article.get("content")
+    cat = article.get("category")
+    summary = article.get("summary", "")
+    key_points = article.get("key_points", [])
+    
+    save_article_as_html(title, content, cat, summary, key_points)
     commit_and_push_to_website()
     print("🎉 每日發文流程完成")
 
