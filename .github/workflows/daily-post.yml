@@ -76,13 +76,3 @@ jobs:
           LIFE_TOPIC: ${{ github.event.inputs.life_topic }}
         run: python scripts/main.py
       
-      - name: 等待網站部署
-        run: sleep 90
-      
-      - name: 寄送摘要給訂閱者
-        env:
-          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
-          SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
-          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-        run: python scripts/daily_digest.py
