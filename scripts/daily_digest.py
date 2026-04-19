@@ -46,7 +46,37 @@ def get_subscribers():
     except Exception as e:
         print(f"❌ 讀取 Google Sheet 失敗: {e}")
         return []
-
+     # ==================== 抓取當日最新文章摘要 ====================   
+    def get_article_summary(article_url):
+    """從文章 HTML 中讀取預存的摘要和重點"""
+    try:
+        response = requests.get(article_url)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # 讀取標題
+        title_tag = soup.find('h1', class_='article-title')
+        title = title_tag.text if title_tag else "無標題"
+        
+        # 從 meta 標籤讀取摘要
+        summary_meta = soup.find('meta', {'name': 'article-summary'})
+        summary = summary_meta['content'] if summary_meta else "無法讀取摘要"
+        
+        # 從 meta 標籤讀取重點
+        keypoints_meta = soup.find('meta', {'name': 'article-keypoints'})
+        if keypoints_meta:
+            try:
+                key_points = json.loads(keypoints_meta['content'])
+                key_points_html = "<ul>" + "".join([f"<li>{point}</li>" for point in key_points]) + "</ul>"
+            except:
+                key_points_html = "<ul><li>無法讀取重點</li></ul>"
+        else:
+            key_points_html = "<ul><li>無法讀取重點</li></ul>"
+        
+        return summary, key_points_html, title
+    except Exception as e:
+        print(f"❌ 讀取文章摘要失敗: {e}")
+        return "無法讀取摘要", "<ul><li>無法讀取重點</li></ul>", "無標題"
 # ==================== 抓取當日最新文章 ====================
 def get_today_article():
     """從 GitHub 讀取 daily-post 目錄中「今天」的最新文章"""
@@ -82,7 +112,6 @@ def get_today_article():
     except Exception as e:
         print(f"❌ 抓取文章失敗: {e}")
         return None, None, None, None
-
 # ==================== 寄送 Email ====================
 def send_email(to_email, to_name, title, summary, key_points_html, article_url):
     """寄送摘要信給單一訂閱者"""
