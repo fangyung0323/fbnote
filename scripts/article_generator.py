@@ -1,139 +1,249 @@
-import json
+import google.generativeai as genai
+import feedparser
 import requests
 import re
-from typing import Dict
+from typing import Dict, Optional
+from bs4 import BeautifulSoup
 
 class ArticleGenerator:
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self.api_url = "https://api.deepseek.com/v1/chat/completions"
+        genai.configure(api_key=api_key)
     
-    def generate(self, category_key: str, category_info: Dict) -> Dict:
-        """使用 DeepSeek 生成完整文章（碳盤查/永續類別會開啟聯網搜尋）"""
+    # ==================== RSS 新聞來源 ====================
+    RSS_SOURCES = {
+        "sustainability": [
+            "https://e-info.org.tw/rss.xml",  # 環境資訊中心
+            "https://csrone.com/rss",          # CSRone 永續智庫
+            "https://www.cna.com.tw/topic/rss/4361",  # 中央社淨零碳排
+        ],
+        "carbon": [
+            "https://e-info.org.tw/rss.xml",  # 環境資訊中心
+            "https://csrone.com/rss",          # CSRone 永續智庫
+        ]
+    }
+    
+    def fetch_latest_news(self, category_key: str) -> Optional[Dict]:
+        """從 RSS 抓取最新一篇新聞"""
+        rss_urls = self.RSS_SOURCES.get(category_key, [])
         
-        # 判斷是否需要聯網搜尋
-        search_categories = ["carbon", "sustainability"]  # 碳盤查 和 永續
-        enable_search = category_key in search_categories
+        for rss_url in rss_urls:
+            try:
+                print(f"📡 嘗試讀取 RSS: {rss_url}")
+                feed = feedparser.parse(rss_url)
+                
+                if feed.entries and len(feed.entries) > 0:
+                    latest = feed.entries[0]
+                    
+                    # 嘗試取得完整內文
+                    content = self._fetch_article_content(latest.link)
+                    
+                    if content:
+                        print(f"✅ 找到新聞: {latest.title}")
+                        return {
+                            "title": latest.title,
+                            "link": latest.link,
+                            "summary": latest.get("summary", ""),
+                            "content": content,
+                            "published": latest.get("published", "")
+                        }
+            except Exception as e:
+                print(f"⚠️ RSS 讀取失敗: {e}")
+                continue
         
-        print(f"🔍 聯網搜尋: {'開啟' if enable_search else '關閉'} (類別: {category_info['name']})")
+        print("❌ 沒有找到可用的新聞")
+        return None
+    
+    def _fetch_article_content(self, url: str) -> Optional[str]:
+        """抓取新聞網頁的完整內文"""
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            response = requests.get(url, headers=headers, timeout=30)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # 移除 script 和 style 標籤
+            for script in soup(["script", "style"]):
+                script.decompose()
+            
+            # 嘗試常見的內文容器
+            content_selectors = [
+                'article', '.article-content', '.post-content', 
+                '.entry-content', '.content', '#main-content'
+            ]
+            
+            content_text = ""
+            for selector in content_selectors:
+                elements = soup.select(selector)
+                if elements:
+                    content_text = elements[0].get_text()
+                    break
+            
+            if not content_text:
+                content_text = soup.get_text()
+            
+            # 清理文字
+            lines = (line.strip() for line in content_text.splitlines())
+            chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+            content_text = ' '.join(chunk for chunk in chunks if chunk)
+            
+            # 限制長度（避免超過 token 限制）
+            content_text = content_text[:6000]
+            
+            return content_text if len(content_text) > 200 else None
+            
+        except Exception as e:
+            print(f"⚠️ 抓取文章內容失敗: {e}")
+            return None
+    
+    def generate_with_news(self, category_key: str, category_info: Dict, news: Dict) -> Dict:
+        """使用新聞內容生成文章"""
+        print(f"📰 使用新聞改寫: {news['title']}")
         
-        system_prompt = """
-你是一個專業的內容創作者，專門為「蕨積」網站撰寫高品質文章。
-請以JSON格式輸出，包含以下欄位：
-- title: 吸引人的文章標題（15字以內）
-- summary: 一句話總結（30字以內）
-- key_points: 三個重點，格式為 ["重點一", "重點二", "重點三"]
-- content: 文章內文，使用HTML格式，包含適當的<h2>、<p>標籤
-- reading_time: 閱讀時間（分鐘）
+        prompt = f"""
+你是「蕨積」網站的專業內容創作者，擅長撰寫科普與生活風格文章。
 
-內文格式要求：
-- 至少3個小節（用<h2>標示）
-- 每個小節至少2個段落
-- 適當使用列表或重點整理
-- 結尾要有總結或行動呼籲
+【參考資料】
+請根據以下新聞內容，改寫成一篇適合網站發布的科普文章。
 
-重要規則：
-1. summary 和 key_points 必須完全從文章內容提煉，不要憑空捏造
-2. title 欄位只能有純文字標題，不要加任何符號
-3. content 欄位只能使用 HTML 標籤，不要使用 Markdown 語法
-4. 不要輸出JSON以外的任何文字
+新聞標題：{news['title']}
+新聞來源：{news['link']}
+新聞日期：{news.get('published', '未知')}
+新聞內容：
+{news['content'][:4000]}
+
+【輸出格式】
+請嚴格按照以下 JSON 格式輸出，不要輸出其他內容：
+{{
+  "title": "改寫後的吸引人標題（15字以內）",
+  "summary": "一句話總結（30字以內）",
+  "key_points": ["重點一", "重點二", "重點三"],
+  "content": "完整文章內容，使用 HTML 格式，包含 <h2>、<p> 標籤",
+  "reading_time": 3
+}}
+
+【要求】
+- 語言使用繁體中文
+- 文章長度約 500-800 字
+- 結尾加上「🌿 蕨積 - 讓生活多一點綠」
+- 不要直接複製貼上，要用自己的話改寫
+- 如果可以，請在新聞結尾附上引用來源
 """
+        return self._call_gemini(prompt, category_info)
+    
+    def generate_without_news(self, category_key: str, category_info: Dict) -> Dict:
+        """沒有新聞時，使用 AI 知識庫生成文章"""
+        print(f"📚 使用知識庫生成文章 (類別: {category_info['name']})")
         
-        if enable_search:
-            user_prompt = f"""
-類別：{category_info['name']} {category_info['emoji']}
-寫作要求：{category_info['prompt']}
+        prompt = f"""
+你是「蕨積」網站的專業內容創作者，擅長撰寫科普與生活風格文章。
 
-【特別要求】
-請先使用聯網搜尋功能，查詢近一週內與「{category_info['name']}」相關的最新新聞、政策、企業案例或研究報告。
-然後根據搜尋結果，結合你的知識，撰寫一篇有深度、有時效性的文章。
+【任務】
+請撰寫一篇關於「{category_info['name']}」的科普或生活文章。
 
-請生成一篇符合該類別風格的文章，並同時產生摘要和重點。
+{category_info['prompt']}
+
+【輸出格式】
+請嚴格按照以下 JSON 格式輸出，不要輸出其他內容：
+{{
+  "title": "吸引人的文章標題（15字以內）",
+  "summary": "一句話總結（30字以內）",
+  "key_points": ["重點一", "重點二", "重點三"],
+  "content": "完整文章內容，使用 HTML 格式，包含 <h2>、<p> 標籤",
+  "reading_time": 3
+}}
+
+【要求】
+- 文章長度約 500-800 字
+- 語言使用繁體中文
+- 結尾加上「🌿 蕨積 - 讓生活多一點綠」
+- 摘要和重點必須從文章內容提煉
 """
-        else:
-            user_prompt = f"""
-類別：{category_info['name']} {category_info['emoji']}
-寫作要求：{category_info['prompt']}
-
-請生成一篇符合該類別風格的文章，並同時產生摘要和重點。
-"""
+        return self._call_gemini(prompt, category_info)
+    
+    def _call_gemini(self, prompt: str, category_info: Dict) -> Dict:
+        """呼叫 Gemini API 並解析回傳"""
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         try:
-            response = requests.post(
-                self.api_url,
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "deepseek-chat",
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ],
+            response = model.generate_content(
+                prompt,
+                generation_config={
                     "temperature": 0.7,
-                    "max_tokens": 2000,
-                    "enable_search": enable_search
-                },
-                timeout=90
+                    "max_output_tokens": 2000,
+                }
             )
             
-            result = response.json()
-            article_data = json.loads(result["choices"][0]["message"]["content"])
-            
-            # 二次清理：確保沒有任何 Markdown 殘留
+            article_data = self._parse_json_response(response.text)
             article_data = self._clean_markdown(article_data)
-            
-            # 添加後設資料
-            from datetime import datetime
-            article_data.update({
-                "category": category_info["name"],
-                "category_key": category_key,
-                "tags": category_info["tags"],
-                "date": datetime.now().strftime("%Y年%m月%d日")
-            })
             
             return article_data
             
         except Exception as e:
-            print(f"❌ 文章生成失敗: {e}")
+            print(f"❌ Gemini API 呼叫失敗: {e}")
             return self._get_fallback_article(category_info)
     
+    def generate(self, category_key: str, category_info: Dict) -> Dict:
+        """主要生成函數：先嘗試抓新聞，沒新聞就用知識庫"""
+        
+        # 判斷是否需要嘗試抓新聞（碳盤查、永續）
+        search_categories = ["carbon", "sustainability"]
+        should_fetch_news = category_key in search_categories
+        
+        if should_fetch_news:
+            print(f"🔍 嘗試從 RSS 抓取最新新聞...")
+            news = self.fetch_latest_news(category_key)
+            
+            if news:
+                return self.generate_with_news(category_key, category_info, news)
+            else:
+                print(f"⚠️ 沒有找到新聞，改用知識庫生成")
+                return self.generate_without_news(category_key, category_info)
+        else:
+            # 植物、生活類別直接用知識庫
+            return self.generate_without_news(category_key, category_info)
+    
+    def _parse_json_response(self, text: str) -> Dict:
+        """從 Gemini 回應中解析 JSON"""
+        try:
+            import json
+            return json.loads(text)
+        except:
+            import re
+            json_match = re.search(r'\{.*\}', text, re.DOTALL)
+            if json_match:
+                import json
+                return json.loads(json_match.group())
+            else:
+                return {
+                    "title": "未知標題",
+                    "summary": "無法解析文章摘要",
+                    "key_points": ["無法提取重點"],
+                    "content": text,
+                    "reading_time": 3
+                }
+    
     def _clean_markdown(self, article_data: Dict) -> Dict:
-        """二次清理：移除任何殘留的 Markdown 語法"""
-        
-        # 清理 title
+        """清理 Markdown 語法"""
         if "title" in article_data:
-            title = article_data["title"]
-            title = re.sub(r'^標題[:：]\s*', '', title)
-            title = re.sub(r'^#+\s*', '', title)
-            title = re.sub(r'\*\*(.+?)\*\*', r'\1', title)
-            article_data["title"] = title.strip()
+            article_data["title"] = re.sub(r'\*\*(.+?)\*\*', r'\1', article_data["title"])
+            article_data["title"] = re.sub(r'^#+\s*', '', article_data["title"])
+            article_data["title"] = article_data["title"].strip()
         
-        # 清理 summary
         if "summary" in article_data:
-            summary = article_data["summary"]
-            summary = re.sub(r'\*\*(.+?)\*\*', r'\1', summary)
-            summary = re.sub(r'^#+\s*', '', summary)
-            article_data["summary"] = summary.strip()
+            article_data["summary"] = re.sub(r'\*\*(.+?)\*\*', r'\1', article_data["summary"])
+            article_data["summary"] = article_data["summary"].strip()
         
-        # 清理 key_points
         if "key_points" in article_data and isinstance(article_data["key_points"], list):
-            cleaned_points = []
-            for point in article_data["key_points"]:
-                point = re.sub(r'\*\*(.+?)\*\*', r'\1', point)
-                point = re.sub(r'^#+\s*', '', point)
-                cleaned_points.append(point.strip())
-            article_data["key_points"] = cleaned_points
+            cleaned = [re.sub(r'\*\*(.+?)\*\*', r'\1', p).strip() for p in article_data["key_points"]]
+            article_data["key_points"] = cleaned
         
-        # 清理 content
         if "content" in article_data:
-            content = article_data["content"]
-            content = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', content)
-            content = re.sub(r'\*(.+?)\*', r'<em>\1</em>', content)
-            content = re.sub(r'^#+\s+', '', content, flags=re.MULTILINE)
-            content = re.sub(r'^---+$', '', content, flags=re.MULTILINE)
-            article_data["content"] = content
+            article_data["content"] = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', article_data["content"])
+            article_data["content"] = re.sub(r'\*(.+?)\*', r'<em>\1</em>', article_data["content"])
         
         return article_data
     
@@ -149,6 +259,6 @@ class ArticleGenerator:
             "reading_time": 3,
             "category": category_info["name"],
             "category_key": "fallback",
-            "tags": category_info["tags"],
+            "tags": category_info.get("tags", []),
             "date": datetime.now().strftime("%Y年%m月%d日")
         }
