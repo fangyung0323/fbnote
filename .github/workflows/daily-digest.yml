@@ -2,7 +2,7 @@ name: 每日摘要寄送
 
 on:
   schedule:
-    - cron: '30 11 * * *'   # 每天 UTC 11:30 (台北 19:30)
+    - cron: '00 10 * * *'   # 每天 UTC 11:30 (台北 19:30)
   workflow_dispatch:        # 允許手動觸發
 
 jobs:
