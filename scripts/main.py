@@ -19,6 +19,29 @@ import re
 import json
 from datetime import datetime
 import requests
+# 在檔案最開頭加入 import
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from utils import check_today_article_exists, get_today_str
+
+def main():
+    print("=" * 50)
+    print("🌿 蕨積每日發文機器人啟動")
+    print(f"執行時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    # ========== 防重複檢查 ==========
+    if check_today_article_exists():
+        print("❌ 今天已經有文章了，跳過本次發文（避免重複）")
+        print("💡 如需強制發文，請手動刪除今天的文章後再執行")
+        return
+    # ================================
+    
+    article = generate_article()
+    if not article or not article.get("title"):
+        print("❌ 文章生成失敗")
+        sys.exit(1)
+    
+    # ... 後續儲存和推送的程式碼不變 ...
 
 # ==================== 配置 ====================
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
