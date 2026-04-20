@@ -16,7 +16,8 @@ import requests
 from bs4 import BeautifulSoup
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-# 在檔案最開頭加入 import
+
+# 導入共用工具函數
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from utils import (
@@ -26,79 +27,7 @@ from utils import (
     get_today_main_article
 )
 
-def get_today_article():
-    """改寫：使用統一的選擇邏輯"""
-    article_filename = get_today_main_article()
-    
-    if not article_filename:
-        print("❌ 找不到今日文章")
-        return None, None, None, None
-    
-    # 建構文章 URL
-    article_url = f"https://www.fernbrom.com/daily-post/{article_filename}"
-    
-    # 讀取文章內容（你原有的邏輯）
-    title, summary, key_points_html = get_article_summary(article_url)
-    
-    return title, summary, key_points_html, article_url
-
-def main():
-    print("=" * 50)
-    print("📧 蕨積每日摘要寄送機器人啟動")
-    print(f"執行時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    
-    # ========== 防重複檢查 ==========
-    # 1. 檢查今天是否有文章
-    if not check_today_article_exists():
-        print("❌ 今天還沒有新文章，跳過寄信")
-        print("💡 請先執行發文機器人")
-        return
-    
-    # 2. 檢查今天是否已經寄過信
-    if check_today_email_sent():
-        print("❌ 今天已經寄過摘要信了，跳過本次寄送")
-        print("💡 如需重新寄送，請手動刪除對應的 Git Tag")
-        return
-    # ================================
-    
-    # 1. 取得訂閱者名單
-    subscribers = get_subscribers()
-    if not subscribers:
-        print("⚠️ 沒有訂閱者，結束程式")
-        return
-    
-    # 2. 抓取當日文章（使用統一邏輯）
-    title, summary, key_points_html, article_url = get_today_article()
-    if not title:
-        print("❌ 無法取得文章，結束程式")
-        return
-    
-    print(f"📝 今日文章：{title}")
-    
-    # 3. 寄送給所有訂閱者
-    success_count = 0
-    for sub in subscribers:
-        name = sub.get("姓名", "讀者")
-        email = sub.get("Email")
-        if not email:
-            continue
-        
-        if send_email(email, name, title, summary, key_points_html, article_url):
-            success_count += 1
-            print(f"✅ 已寄送給 {name} ({email})")
-        else:
-            print(f"❌ 寄送失敗 {name} ({email})")
-    
-    print(f"🎉 寄送完成：成功 {success_count} / 總共 {len(subscribers)} 位")
-    
-    # ========== 標記已寄信 ==========
-    if success_count > 0:
-        mark_email_sent()
-    # ================================
-    
-    print("=" * 50)
 # ==================== 讀取環境變數 ====================
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")  # 保留以備用
 SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
 GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
@@ -167,42 +96,24 @@ def get_article_summary(article_url):
         print(f"❌ 讀取文章摘要失敗: {e}")
         return "無法讀取摘要", "<ul><li>無法讀取重點</li></ul>", "無標題"
 
-# ==================== 抓取當日最新文章 ====================
+# ==================== 抓取當日文章（使用統一邏輯） ====================
 def get_today_article():
-    """從 GitHub API 讀取 daily-post 目錄中「今天」的最新文章"""
-    try:
-        url = "https://api.github.com/repos/fangyung0323/fb/contents/daily-post"
-        headers = {"Accept": "application/vnd.github.v3+json"}
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        files = response.json()
-        
-        # 只取今天的日期
-        today_str = datetime.now().strftime("%Y-%m-%d")
-        
-        # 篩選出今天的文章
-        today_files = [f for f in files if f["name"].startswith(today_str) and f["name"].endswith(".html") and f["name"] != "index.html"]
-        
-        if not today_files:
-            print(f"❌ 沒有找到 {today_str} 的文章")
-            return None, None, None, None
-        
-        # 按檔名排序，取最新的一篇
-        today_files.sort(key=lambda x: x["name"], reverse=True)
-        latest = today_files[0]
-        
-        # 給訂閱者的連結（網站網址）
-        article_url = f"https://www.fernbrom.com/daily-post/{latest['name']}"
-        
-        print(f"📰 找到今日文章: {latest['name']}")
-        
-        # 從文章 HTML 中讀取摘要和重點
-        summary, key_points_html, title = get_article_summary(article_url)
-        
-        return title, summary, key_points_html, article_url
-    except Exception as e:
-        print(f"❌ 抓取文章失敗: {e}")
+    """從 GitHub API 讀取今日文章（使用統一的選擇邏輯）"""
+    article_filename = get_today_main_article()
+    
+    if not article_filename:
+        print("❌ 找不到今日文章")
         return None, None, None, None
+    
+    # 建構文章 URL
+    article_url = f"https://www.fernbrom.com/daily-post/{article_filename}"
+    
+    print(f"📰 找到今日文章: {article_filename}")
+    
+    # 從文章 HTML 中讀取摘要和重點
+    summary, key_points_html, title = get_article_summary(article_url)
+    
+    return title, summary, key_points_html, article_url
 
 # ==================== 寄送 Email ====================
 def send_email(to_email, to_name, title, summary, key_points_html, article_url):
@@ -225,7 +136,7 @@ def send_email(to_email, to_name, title, summary, key_points_html, article_url):
         <div style="background: #faf8f4; padding: 16px; border-radius: 12px;">
             <p><strong>📖 文章名稱：</strong> {title}</p>
             <p><strong>📌 摘要：</strong> {summary}</p>
-            <p><strong>✨</strong></p>
+            <p><strong>✨ 重點整理：</strong></p>
             {key_points_html}
             <p><strong>👉</strong> <a href="https://www.fernbrom.com/daily-post/" style="color: #5a7a4a;">閱讀更多</a></p>
         </div>
@@ -259,13 +170,27 @@ def main():
     print("📧 蕨積每日摘要寄送機器人啟動")
     print(f"執行時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
+    # ========== 防重複檢查 ==========
+    # 1. 檢查今天是否有文章
+    if not check_today_article_exists():
+        print("❌ 今天還沒有新文章，跳過寄信")
+        print("💡 請先執行發文機器人")
+        return
+    
+    # 2. 檢查今天是否已經寄過信
+    if check_today_email_sent():
+        print("❌ 今天已經寄過摘要信了，跳過本次寄送")
+        print("💡 如需重新寄送，請手動刪除對應的 Git Tag")
+        return
+    # ================================
+    
     # 1. 取得訂閱者名單
     subscribers = get_subscribers()
     if not subscribers:
         print("⚠️ 沒有訂閱者，結束程式")
         return
     
-    # 2. 抓取當日文章摘要
+    # 2. 抓取當日文章（使用統一邏輯）
     title, summary, key_points_html, article_url = get_today_article()
     if not title:
         print("❌ 無法取得文章，結束程式")
@@ -289,6 +214,12 @@ def main():
             print(f"❌ 寄送失敗 {name} ({email})")
     
     print(f"🎉 寄送完成：成功 {success_count} / 總共 {len(subscribers)} 位")
+    
+    # ========== 標記已寄信 ==========
+    if success_count > 0:
+        mark_email_sent()
+    # ================================
+    
     print("=" * 50)
 
 if __name__ == "__main__":
