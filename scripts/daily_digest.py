@@ -143,7 +143,8 @@ def send_email(to_email, to_name, title, summary, key_points_html, article_url):
         <p>蕨積|每日摘要：</p>
         <hr style="border-color: #d4e4c8;">
         <div style="background: #faf8f4; padding: 16px; border-radius: 12px;">
-            <p><strong>📌</strong> {summary}</p>
+            <p><strong>📖 文章名稱：</strong> {title}</p>
+            <p><strong>📌 摘要：</strong> {summary}</p>
             <p><strong>✨</strong></p>
             {key_points_html}
             <p><strong>👉</strong> <a href="https://www.fernbrom.com/daily-post/" style="color: #5a7a4a;">閱讀更多</a></p>
