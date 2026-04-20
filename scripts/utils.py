@@ -8,8 +8,8 @@ import requests
 from datetime import datetime
 
 # GitHub 倉庫設定
-GITHUB_REPO_OWNER = "fangyung0323"  # 改成你的使用者名稱
-GITHUB_REPO_NAME = "fb"  # 倉庫名稱
+GITHUB_REPO_OWNER = "fangyung0323"
+GITHUB_REPO_NAME = "fb"
 DAILY_POST_PATH = "daily-post"
 
 def get_today_str():
@@ -38,7 +38,6 @@ def check_today_article_exists():
         url = f"https://api.github.com/repos/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/contents/{DAILY_POST_PATH}"
         headers = {"Accept": "application/vnd.github.v3+json"}
         
-        # 如果有 GitHub Token，加入 header 提高限流上限
         token = os.getenv("GH_TOKEN")
         if token:
             headers["Authorization"] = f"Bearer {token}"
@@ -57,13 +56,10 @@ def check_today_article_exists():
                 print(f"⚠️ 遠端已存在今日文章：{', '.join(today_files)}")
                 return True
         elif response.status_code == 404:
-            # 目錄不存在，表示還沒有任何文章
             return False
         else:
             print(f"⚠️ GitHub API 回應錯誤：{response.status_code}")
             
-    except requests.exceptions.RequestException as e:
-        print(f"⚠️ 無法連線到 GitHub API：{e}")
     except Exception as e:
         print(f"⚠️ 檢查遠端文章時發生錯誤：{e}")
     
@@ -72,8 +68,7 @@ def check_today_article_exists():
 def check_today_email_sent():
     """
     檢查今天是否已經寄過信
-    使用 GitHub 的 Tag 或 Release 來記錄
-    回傳 True: 已寄過, False: 尚未寄送
+    使用 GitHub 的 Tag 來記錄
     """
     today_str = get_today_str()
     tag_name = f"email-sent-{today_str}"
@@ -109,7 +104,7 @@ def mark_email_sent():
     tag_name = f"email-sent-{today_str}"
     
     try:
-        # 建立一個輕量級 tag
+        # 建立 tag
         cmd = f'git tag {tag_name}'
         result = os.system(cmd)
         
@@ -149,7 +144,7 @@ def get_today_main_article():
             today_files = []
             
             for file in files:
-                if file["name"].startswith(today_str) and file["name"].endswith(".html"):
+                if file["name"].startswith(today_str) and file["name"].endswith(".html") and file["name"] != "index.html":
                     today_files.append(file["name"])
             
             if not today_files:
@@ -157,7 +152,7 @@ def get_today_main_article():
                 return None
             
             # 按檔名排序，取第一篇（確保與 index 一致）
-            today_files.sort(key=lambda x: x)  # 字母順序正序
+            today_files.sort(key=lambda x: x)
             selected = today_files[0]
             print(f"📌 選擇今日主打文章：{selected}")
             return selected
