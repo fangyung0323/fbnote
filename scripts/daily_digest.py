@@ -57,7 +57,55 @@ def get_subscribers():
         print(f"❌ 讀取 Google Sheet 失敗: {e}")
         return []
 
-# ==================== 從文章讀取摘要和重點 ====================
+# def main():
+    print("=" * 50)
+    print("📧 蕨積每日摘要寄送機器人啟動")
+    print(f"執行時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    # ========== 除錯：直接檢查 GitHub API ==========
+    print("\n🔍 開始除錯檢查...")
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    print(f"今天的日期: {today_str}")
+    
+    url = "https://api.github.com/repos/fangyung0323/fb/contents/daily-post"
+    headers = {"Accept": "application/vnd.github.v3+json"}
+    token = os.getenv("GH_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+        print("✅ GH_TOKEN 已設定")
+    else:
+        print("❌ GH_TOKEN 未設定")
+    
+    response = requests.get(url, headers=headers)
+    print(f"GitHub API 回應狀態: {response.status_code}")
+    
+    if response.status_code == 200:
+        files = response.json()
+        today_files = []
+        for file in files:
+            if file["name"].startswith(today_str) and file["name"].endswith(".html"):
+                today_files.append(file["name"])
+        
+        print(f"找到的今日文章: {today_files}")
+        if today_files:
+            print(f"✅ 應該要找到文章！")
+        else:
+            print(f"❌ 沒有找到今日文章")
+            print(f"最近的文章: {[f['name'] for f in files[:5]]}")
+    else:
+        print(f"❌ API 呼叫失敗: {response.text[:200]}")
+    
+    print("=" * 50)
+    # ========== 除錯結束 ==========
+    
+    # 原本的防重複檢查（暫時註解）
+    # if not check_today_article_exists():
+    #     print("❌ 今天還沒有新文章，跳過寄信")
+    #     print("💡 請先執行發文機器人")
+    #     return
+    
+    # ... 其餘程式碼不變==================== 從文章讀取摘要和重點 ====================
+
 def get_article_summary(article_url):
     """從文章 HTML 中讀取預存的摘要和重點（自動轉換為 GitHub Raw）"""
     try:
