@@ -49,7 +49,7 @@ def get_subscribers():
         sheet = client.open_by_key(GOOGLE_SHEET_ID).sheet1
         records = sheet.get_all_records()
         
-        # 修改這裡：支援 subscribed 或 active
+        # 支援 subscribed 或 active
         subscribers = [row for row in records if row.get("狀態") in ["active", "subscribed"]]
         print(f"📋 從 Google Sheet 讀取到 {len(subscribers)} 位訂閱者")
         return subscribers
@@ -57,55 +57,7 @@ def get_subscribers():
         print(f"❌ 讀取 Google Sheet 失敗: {e}")
         return []
 
-# def main():
-    print("=" * 50)
-    print("📧 蕨積每日摘要寄送機器人啟動")
-    print(f"執行時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    
-    # ========== 除錯：直接檢查 GitHub API ==========
-    print("\n🔍 開始除錯檢查...")
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    print(f"今天的日期: {today_str}")
-    
-    url = "https://api.github.com/repos/fangyung0323/fb/contents/daily-post"
-    headers = {"Accept": "application/vnd.github.v3+json"}
-    token = os.getenv("GH_TOKEN")
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-        print("✅ GH_TOKEN 已設定")
-    else:
-        print("❌ GH_TOKEN 未設定")
-    
-    response = requests.get(url, headers=headers)
-    print(f"GitHub API 回應狀態: {response.status_code}")
-    
-    if response.status_code == 200:
-        files = response.json()
-        today_files = []
-        for file in files:
-            if file["name"].startswith(today_str) and file["name"].endswith(".html"):
-                today_files.append(file["name"])
-        
-        print(f"找到的今日文章: {today_files}")
-        if today_files:
-            print(f"✅ 應該要找到文章！")
-        else:
-            print(f"❌ 沒有找到今日文章")
-            print(f"最近的文章: {[f['name'] for f in files[:5]]}")
-    else:
-        print(f"❌ API 呼叫失敗: {response.text[:200]}")
-    
-    print("=" * 50)
-    # ========== 除錯結束 ==========
-    
-    # 原本的防重複檢查（暫時註解）
-    # if not check_today_article_exists():
-    #     print("❌ 今天還沒有新文章，跳過寄信")
-    #     print("💡 請先執行發文機器人")
-    #     return
-    
-    # ... 其餘程式碼不變==================== 從文章讀取摘要和重點 ====================
-
+# ==================== 從文章讀取摘要和重點 ====================
 def get_article_summary(article_url):
     """從文章 HTML 中讀取預存的摘要和重點（自動轉換為 GitHub Raw）"""
     try:
@@ -219,19 +171,52 @@ def main():
     print("📧 蕨積每日摘要寄送機器人啟動")
     print(f"執行時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
-    # ========== 防重複檢查 ==========
-    # 1. 檢查今天是否有文章
-    if not check_today_article_exists():
-        print("❌ 今天還沒有新文章，跳過寄信")
-        print("💡 請先執行發文機器人")
-        return
+    # ========== 除錯：直接檢查 GitHub API ==========
+    print("\n🔍 開始除錯檢查...")
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    print(f"今天的日期: {today_str}")
     
-    # 2. 檢查今天是否已經寄過信
+    url = "https://api.github.com/repos/fangyung0323/fb/contents/daily-post"
+    headers = {"Accept": "application/vnd.github.v3+json"}
+    token = os.getenv("GH_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+        print("✅ GH_TOKEN 已設定")
+    else:
+        print("❌ GH_TOKEN 未設定")
+    
+    response = requests.get(url, headers=headers)
+    print(f"GitHub API 回應狀態: {response.status_code}")
+    
+    if response.status_code == 200:
+        files = response.json()
+        today_files = []
+        for file in files:
+            if file["name"].startswith(today_str) and file["name"].endswith(".html"):
+                today_files.append(file["name"])
+        
+        print(f"找到的今日文章: {today_files}")
+        if today_files:
+            print(f"✅ 應該要找到文章！")
+        else:
+            print(f"❌ 沒有找到今日文章")
+            print(f"最近的文章: {[f['name'] for f in files[:5]]}")
+    else:
+        print(f"❌ API 呼叫失敗: {response.text[:200]}")
+    
+    print("=" * 50)
+    # ========== 除錯結束 ==========
+    
+    # 暫時註解防重複檢查
+    # if not check_today_article_exists():
+    #     print("❌ 今天還沒有新文章，跳過寄信")
+    #     print("💡 請先執行發文機器人")
+    #     return
+    
     if check_today_email_sent():
         print("❌ 今天已經寄過摘要信了，跳過本次寄送")
         print("💡 如需重新寄送，請手動刪除對應的 Git Tag")
         return
-    # ================================
     
     # 1. 取得訂閱者名單
     subscribers = get_subscribers()
@@ -264,10 +249,8 @@ def main():
     
     print(f"🎉 寄送完成：成功 {success_count} / 總共 {len(subscribers)} 位")
     
-    # ========== 標記已寄信 ==========
     if success_count > 0:
         mark_email_sent()
-    # ================================
     
     print("=" * 50)
 
