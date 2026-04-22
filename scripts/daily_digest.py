@@ -35,7 +35,7 @@ GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
 
 # ==================== 從 Google Sheet 讀取訂閱者 ====================
 def get_subscribers():
-    """從 Google Sheet 讀取訂閱者名單（狀態為 active）"""
+    """從 Google Sheet 讀取訂閱者名單（狀態為 subscribed 或 active）"""
     if not GOOGLE_SERVICE_ACCOUNT_JSON:
         print("❌ 錯誤：GOOGLE_SERVICE_ACCOUNT_JSON 環境變數未設定")
         return []
@@ -49,7 +49,8 @@ def get_subscribers():
         sheet = client.open_by_key(GOOGLE_SHEET_ID).sheet1
         records = sheet.get_all_records()
         
-        subscribers = [row for row in records if row.get("狀態") == "active"]
+        # 修改這裡：支援 subscribed 或 active
+        subscribers = [row for row in records if row.get("狀態") in ["active", "subscribed"]]
         print(f"📋 從 Google Sheet 讀取到 {len(subscribers)} 位訂閱者")
         return subscribers
     except Exception as e:
