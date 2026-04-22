@@ -64,7 +64,7 @@ def get_article_summary(article_url):
         # 將網站網址轉換為 GitHub Raw 網址（避免等待 Render 部署）
         if "fernbrom.com" in article_url:
             filename = article_url.split('/')[-1]
-            raw_url = f"https://raw.githubusercontent.com/fangyung0323/fb/main/daily-post/{filename}"
+            raw_url = f"https://raw.githubusercontent.com/isa930323/fb/main/daily-post/{filename}"
             print(f"📡 從 GitHub Raw 讀取: {raw_url}")
             response = requests.get(raw_url)
         else:
@@ -176,7 +176,7 @@ def main():
     today_str = datetime.now().strftime("%Y-%m-%d")
     print(f"今天的日期: {today_str}")
     
-    url = "https://api.github.com/repos/fangyung0323/fb/contents/daily-post"
+    url = "https://api.github.com/repos/isa930323/fb/contents/daily-post"
     headers = {"Accept": "application/vnd.github.v3+json"}
     token = os.getenv("GH_TOKEN")
     if token:
