@@ -8,7 +8,7 @@ import requests
 from datetime import datetime
 
 # GitHub 倉庫設定
-GITHUB_REPO_OWNER = "fangyung0323"
+GITHUB_REPO_OWNER = "isa930323-jpg"
 GITHUB_REPO_NAME = "fb"
 DAILY_POST_PATH = "daily-post"
 
