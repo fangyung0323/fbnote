@@ -837,25 +837,39 @@ def generate_daily_post_index(daily_post_dir):
     full_content_html = latest.get('content', '')
     
     # 右側熱門分類與連結
+    # 計算本站統計
+    total_articles = len(articles)
+    total_words = 0
+    category_counts = {cat: 0 for cat in CATEGORIES}
+    
+    for article in articles:
+        category_counts[article['category']] = category_counts.get(article['category'], 0) + 1
+        # 粗略估算字數（文章內容長度）
+        content_len = len(article.get('content', ''))
+        total_words += content_len
+    
+    # 平均每篇約 500-800 字，取中間值 650 字估算
+    estimated_words = total_articles * 650
+    
+    # 右側分類瀏覽 + 本站統計
     sidebar_html = f"""
                     <div class="sidebar-col">
                         <div class="sidebar-card">
                             <h3>🌿 分類瀏覽</h3>
                             <ul class="sidebar-links">
-                                <li><a href="plant.html">🌱 植物文章</a></li>
-                                <li><a href="sustainability.html">♻️ 永續文章</a></li>
-                                <li><a href="carbon.html">📊 碳盤查文章</a></li>
-                                <li><a href="life.html">🏡 生活文章</a></li>
+                                <li><a href="plant.html">🌱 植物文章 <span class="count-badge">{category_counts.get('植物', 0)}</span></a></li>
+                                <li><a href="sustainability.html">♻️ 永續文章 <span class="count-badge">{category_counts.get('永續', 0)}</span></a></li>
+                                <li><a href="carbon.html">📊 碳盤查文章 <span class="count-badge">{category_counts.get('碳盤查', 0)}</span></a></li>
+                                <li><a href="life.html">🏡 生活文章 <span class="count-badge">{category_counts.get('生活', 0)}</span></a></li>
                             </ul>
                         </div>
                         <div class="sidebar-card">
-                            <h3>📅 最新文章</h3>
-                            <ul class="sidebar-links">
-                                <li><a href="{latest['filename']}">{latest['title']}</a></li>
-                    """
-    for article in past_articles[:5]:
-        sidebar_html += f'<li><a href="{article["filename"]}">{article["title"]}</a></li>'
-    sidebar_html += """
+                            <h3>📊 本站統計</h3>
+                            <ul class="sidebar-stats">
+                                <li>📄 總文章數：<strong>{total_articles}</strong> 篇</li>
+                                <li>📝 累積字數：約 <strong>{estimated_words:,}</strong> 字</li>
+                                <li>📅 更新頻率：每日一篇</li>
+                                <li>🌱 主題分類：{len(CATEGORIES)} 大類</li>
                             </ul>
                         </div>
                     </div>"""
@@ -956,7 +970,27 @@ def generate_daily_post_index(daily_post_dir):
     }}
     .sidebar-links {{
         list-style: none;
+    }}    .count-badge {{
+        float: right;
+        background: #e8e0d8;
+        padding: 0.1rem 0.5rem;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        color: #5a7a4a;
     }}
+    .sidebar-stats {{
+        list-style: none;
+    }}
+    .sidebar-stats li {{
+        margin-bottom: 0.6rem;
+        font-size: 0.85rem;
+        color: var(--stone);
+    }}
+    .sidebar-stats strong {{
+        color: var(--moss);
+        font-weight: 600;
+    }}
+    
     .sidebar-links li {{
         margin-bottom: 0.5rem;
     }}
