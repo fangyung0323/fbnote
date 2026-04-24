@@ -6,7 +6,7 @@
 - 預設主題從內建庫中隨機選擇
 - 文章保存為 HTML（套用官網模板）
 - 推送到網站倉庫的 daily-post 目錄
-- 自動生成索引頁面（外掛導覽列 + 分類篩選）
+- 自動生成索引頁面（外掛導覽列 + 分類篩選 + 即時搜尋）
 """
 
 import os
@@ -40,14 +40,32 @@ SUB_TOPICS = {
     "植物": [
         "植生牆入門指南：打造你的第一面垂直花園",
         "室內植物養護秘訣：讓你的綠朋友活得更健康",
-        "植生牆養護全攻略：修剪、施肥、病蟲害防治",
         "從零開始：植生牆的結構、防水、排水規劃",
         "植物如何悄悄改善你的室內空氣品質",
         "辦公室植生牆：提升工作效率的綠色解方",
-        "植生牆的燈光設計：晚上也能欣賞的綠牆美學",
         "植物療癒力：為什麼看著植物會感到放鬆",
         "台灣原生植物之美：認識身邊的綠色鄰居",
         "植物與兒童教育：讓孩子從自然中學習",
+        "植生牆入門指南：打造你的第一面垂直花園",
+        "植生牆的結構設計：骨架、防水、排水一次搞懂",
+        "植生牆植物怎麼選？耐陰、好養、漂亮的推薦清單",
+        "植生牆養護全攻略：澆水、修剪、施肥、病蟲害",
+        "室內植生牆 vs 戶外植生牆：設計重點大不同",
+        "小空間大改造：陽台植生牆這樣做",
+        "辦公室植生牆：提升工作效率與空氣品質",
+        "植生牆的自動澆灌系統：懶人也能養得漂亮",
+        "植生牆的燈光設計：白天晚上都美的關鍵",
+        "植生牆常見失敗原因與解決方案",
+        "預算有限怎麼做？低成本植生牆DIY教學",
+        "植生牆如何影響室內溫度和濕度？",
+        "商業空間植生牆：餐廳、旅店、店面的吸睛利器",
+        "植生牆的永續價值：綠化、節能、減碳一次滿足",
+        "台灣適合植生牆的原生植物推薦",
+        "植生牆的維護成本分析：長期持有值得嗎？",
+        "從零開始：植生牆施工流程完整解析",
+        "植生牆 vs 傳統盆栽：優缺點比較",
+        "植生牆如何幫助建築降溫？實測數據分享",
+        "打造會呼吸的家：植生牆讓室內空氣更清新
         "辦公室植物推薦：提升工作效率的綠色夥伴"
     ],
     "永續": [
@@ -467,7 +485,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 # ==================== 文章生成 ====================
 def generate_article():
-    """调用 DeepSeek API 生成文章内容"""
+    """调用 DeepSeek API 生成文章内容，回傳 dict（包含 title, content, category, summary, key_points）"""
     if not DEEPSEEK_API_KEY:
         print("❌ 錯誤：DEEPSEEK_API_KEY 環境變數未設定")
         return None
@@ -516,8 +534,8 @@ def generate_article():
 文章結構：{structure}
 
 【重要】請以 JSON 格式輸出，包含以下欄位：
-- title: 文章標題（15字以內）
-- summary: 一句話總結（30字以內）
+- title: 文章標題（15字以內，吸引人）
+- summary: 一句話總結（30字以內，讓人想點進來）
 - key_points: 三個重點，格式為 ["重點一", "重點二", "重點三"]
 - content: 文章內文（使用 HTML 格式，包含 <h2>、<p> 標籤）
 
@@ -525,7 +543,7 @@ def generate_article():
 1. 文章長度約 500-800 字
 2. 語言使用繁體中文
 3. 結尾加上「🌿 蕨積 - 讓生活多一點綠」
-4. 不要使用 Markdown 語法
+4. 不要使用 Markdown 語法（不要用 **bold**、# 標題）
 5. 不要輸出 JSON 以外的任何文字
 """
 
@@ -559,10 +577,14 @@ def generate_article():
         content = article_data.get("content", "")
         
         content = re.sub(r'\*\*(.+?)\*\*', r'\1', content)
+        content = re.sub(r'\*(.+?)\*', r'\1', content)
         content = re.sub(r'^#{1,6}\s+', '', content, flags=re.MULTILINE)
         
         if not title:
             title = f"{category}｜{subtopic[:20]}"
+        
+        if not isinstance(key_points, list):
+            key_points = []
 
         print(f"✅ 文章生成成功：{title}")
         print(f"📂 類別：{category}")
@@ -580,14 +602,17 @@ def generate_article():
 
 # ==================== 儲存文章 ====================
 def save_article_as_html(title, content, category, summary, key_points, output_dir="articles"):
+    """儲存文章為 HTML 檔案（優化版：確保標題格式、增加 meta 資訊）"""
     os.makedirs(output_dir, exist_ok=True)
     date_str = datetime.now().strftime("%Y-%m-%d")
-    safe_title = title.replace(" ", "-").replace("/", "-").replace("?", "").replace("！", "")[:50]
+    safe_title = title.replace(" ", "-").replace("/", "-").replace("?", "").replace("！", "").replace("：", "-")[:50]
     safe_title = re.sub(r'^(標題|Title)[:：]\s*', '', safe_title)
     filename = f"{date_str}-{safe_title}.html"
     filepath = os.path.join(output_dir, filename)
     category_color = CATEGORY_COLORS.get(category, "#4a7c59")
-    content_html = content.replace("\n", "<br>")
+    
+    content_html = content
+    
     key_points_json = json.dumps(key_points, ensure_ascii=False)
     
     category_page_map = {
@@ -602,10 +627,13 @@ def save_article_as_html(title, content, category, summary, key_points, output_d
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="description" content="{summary}">
     <meta name="article-summary" content="{summary}">
     <meta name="article-keypoints" content='{key_points_json}'>
+    <meta name="article-category" content="{category}">
+    <meta name="article-date" content="{date_str}">
+    <meta name="author" content="蕨積 FernBrom">
     <title>{title} - 蕨積每日文章</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
@@ -630,19 +658,76 @@ def save_article_as_html(title, content, category, summary, key_points, output_d
         color: var(--moss);
         margin-bottom: 0.5rem;
         font-family: 'Noto Serif TC', serif;
+        line-height: 1.3;
     }}
     .article-date {{
         color: var(--stone);
         margin-bottom: 2rem;
         font-size: 0.9rem;
+        border-bottom: 1px solid #e0d6cc;
+        padding-bottom: 1rem;
     }}
     .article-content {{
         line-height: 1.8;
-        font-size: 1rem;
+        font-size: 1.05rem;
+    }}
+    .article-content h2 {{
+        font-size: 1.5rem;
+        margin: 1.5rem 0 0.8rem 0;
+        color: var(--moss);
+        font-family: 'Noto Serif TC', serif;
+        font-weight: 600;
+        border-left: 4px solid {category_color};
+        padding-left: 1rem;
+    }}
+    .article-content h3 {{
+        font-size: 1.2rem;
+        margin: 1.2rem 0 0.6rem 0;
+        color: var(--fern);
+    }}
+    .article-content p {{
+        margin-bottom: 1rem;
+    }}
+    .article-content ul, .article-content ol {{
+        margin: 1rem 0 1rem 2rem;
+    }}
+    .article-content li {{
+        margin-bottom: 0.3rem;
+    }}
+    .article-content strong {{
+        color: var(--moss);
+        font-weight: 600;
+    }}
+    .article-footer {{
+        margin-top: 3rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid #e0d6cc;
+        text-align: center;
+    }}
+    .back-links {{
+        display: flex;
+        justify-content: center;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+        margin: 1rem 0;
+    }}
+    .back-links a {{
+        color: var(--fern);
+        text-decoration: none;
+        font-size: 0.9rem;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        transition: background 0.2s;
+    }}
+    .back-links a:hover {{
+        background: #e8e0d8;
+        text-decoration: underline;
     }}
     @media (max-width: 768px) {{
         .article-title {{ font-size: 1.5rem; }}
         .article-container {{ padding: 0 1rem; }}
+        .article-content h2 {{ font-size: 1.3rem; }}
+        .back-links {{ gap: 0.8rem; }}
     }}
     </style>
 </head>
@@ -652,15 +737,17 @@ def save_article_as_html(title, content, category, summary, key_points, output_d
         <div class="article-container">
             <div class="article-category">📌 {category}</div>
             <h1 class="article-title">{title}</h1>
-            <div class="article-date">📅 {datetime.now().strftime("%Y年%m月%d日")}</div>
-            <div class="article-content">{content_html}</div>
-          
-            <div class="footer">
-                <br>每日一篇，與你一起成長<br><br>
-                <div class="nav-links">
-                    <a href="index.html">← 返回每日文章</a> &nbsp;|&nbsp;
-                    <a href="{category_page}">← 返回{category}文章分類</a> &nbsp;|&nbsp;
-                    <a href="../shop.html">🌱 植物選品</a> &nbsp;|&nbsp;
+            <div class="article-date">📅 {date_str}</div>
+            <div class="article-content">
+                {content_html}
+            </div>
+            
+            <div class="article-footer">
+                <p style="color: var(--stone); font-size: 0.85rem;">🌿 每日一篇，與你一起成長</p>
+                <div class="back-links">
+                    <a href="index.html">🏠 返回首頁</a>
+                    <a href="{category_page}">📂 返回{category}分類</a>
+                    <a href="../shop.html">🌱 植物選品</a>
                     <a href="../consult.html">💚 綠色服務</a>
                 </div>
             </div>
@@ -678,14 +765,13 @@ def save_article_as_html(title, content, category, summary, key_points, output_d
 
 # ==================== 索引頁面生成 ====================
 def generate_daily_post_index(daily_post_dir):
-    """產生 daily-post 目錄的索引頁面（外掛導覽列 + 分類篩選）"""
+    """產生 daily-post 目錄的索引頁面 + 分類頁面（乾淨標題列表 + 即時搜尋）"""
     articles = []
     for file in os.listdir(daily_post_dir):
         if file.endswith(".html") and file != "index.html" and len(file) >= 10 and file[4] == '-' and file[7] == '-':
             filepath = os.path.join(daily_post_dir, file)
             category = "未分類"
             title = ""
-            content_html = ""
             date_str = file[:10]
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
@@ -696,17 +782,13 @@ def generate_daily_post_index(daily_post_dir):
                     match_title = re.search(r'<h1 class="article-title">(.+?)</h1>', full_content)
                     if match_title:
                         title = match_title.group(1)
-                    match_content = re.search(r'<div class="article-content">(.*?)</div>', full_content, re.DOTALL)
-                    if match_content:
-                        content_html = match_content.group(1)
             except:
                 title = file.replace(".html", "").replace(date_str + "-", "").replace("-", " / ")
             articles.append({
                 "filename": file,
                 "date": date_str,
                 "title": title,
-                "category": category,
-                "content": content_html
+                "category": category
             })
     articles.sort(key=lambda x: x["date"], reverse=True)
 
@@ -738,44 +820,18 @@ def generate_daily_post_index(daily_post_dir):
         print("📑 已更新 daily-post/index.html (無文章)")
         return
 
+    # 產生主索引頁面
     latest = articles[0]
     past_articles = articles[1:]
-
-    archive_by_month = {}
-    for article in past_articles:
-        month_key = article["date"][:7]
-        if month_key not in archive_by_month:
-            archive_by_month[month_key] = []
-        archive_by_month[month_key].append(article)
-
+    
     past_list_html = ""
     for article in past_articles[:30]:
-        cat_color = CATEGORY_COLORS.get(article["category"], "#6c757d")
         past_list_html += f"""
-                        <li class="past-item" data-category="{article['category']}">
-                            <span class="past-badge" style="background: {cat_color};">{article['category']}</span>
+                        <li class="past-item">
                             <a class="past-link" href="{article['filename']}">{article['title']}</a>
-                            <div class="past-meta">📅 {article['date']}</div>
+                            <div class="past-meta">📅 {article['date']} · {article['category']}</div>
                         </li>"""
-
-    archive_html = ""
-    sorted_months = sorted(archive_by_month.keys(), reverse=True)
-    for month in sorted_months:
-        month_display = f"{month[:4]}年{int(month[5:7])}月"
-        archive_html += f"""
-                    <div class="archive-month">
-                        <div class="archive-month-title">{month_display}</div>
-                        <ul class="archive-list">"""
-        for article in archive_by_month[month][:8]:
-            archive_html += f'<li><a href="{article["filename"]}">{article["title"][:25]}{"..." if len(article["title"]) > 25 else ""}</a></li>'
-        if len(archive_by_month[month]) > 8:
-            archive_html += f'<li><a href="#" style="color:#aaa;">... 共{len(archive_by_month[month])}篇</a></li>'
-        archive_html += """
-                        </ul>
-                    </div>"""
-
-    latest_cat_color = CATEGORY_COLORS.get(latest['category'], "#6c757d")
-
+    
     index_html = f"""<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -786,7 +842,7 @@ def generate_daily_post_index(daily_post_dir):
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>{get_template_styles()}
-    .daily-container {{ max-width: 1200px; margin: 0 auto; padding: 0 2rem; }}
+    .daily-container {{ max-width: 1000px; margin: 0 auto; padding: 0 2rem; }}
     .page-header {{ text-align: center; margin-bottom: 2rem; }}
     .page-header h1 {{ color: var(--moss); font-size: 2rem; font-family: 'Noto Serif TC', serif; }}
     .page-header p {{ color: var(--stone); margin-top: 0.5rem; }}
@@ -808,13 +864,10 @@ def generate_daily_post_index(daily_post_dir):
         transition: transform 0.2s;
         background: #e8e0d8;
         color: #4a5b4e;
+        text-decoration: none;
+        display: inline-block;
     }}
-    .category-btn:hover {{ transform: translateY(-2px); }}
-    .category-btn.active {{ background: #4a7c59; color: white; }}
-    
-    .two-columns {{ display: flex; gap: 2rem; flex-wrap: wrap; }}
-    .main-col {{ flex: 3; min-width: 250px; }}
-    .sidebar-col {{ flex: 1; min-width: 200px; background: white; border-radius: 16px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: fit-content; }}
+    .category-btn:hover {{ transform: translateY(-2px); background: #4a7c59; color: white; }}
     
     .latest-article {{
         background: white;
@@ -823,36 +876,18 @@ def generate_daily_post_index(daily_post_dir):
         margin-bottom: 2rem;
         box-shadow: 0 2px 12px rgba(0,0,0,0.08);
     }}
-    .latest-category {{
-        display: inline-block;
-        background: {latest_cat_color};
-        color: white;
-        padding: 0.2rem 0.8rem;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        margin-bottom: 1rem;
-    }}
     .latest-title {{ font-size: 1.8rem; color: var(--moss); margin-bottom: 0.5rem; }}
-    .latest-date {{ color: var(--stone); margin-bottom: 1.5rem; font-size: 0.9rem; }}
-    .latest-content {{ line-height: 1.8; }}
+    .latest-date {{ color: var(--stone); margin-bottom: 1rem; font-size: 0.9rem; }}
     .read-more {{ display: inline-block; margin-top: 1rem; color: var(--fern); text-decoration: none; font-weight: 500; }}
     
     .section-title {{ font-size: 1.2rem; color: var(--moss); border-bottom: 2px solid #e0d6cc; padding-bottom: 0.5rem; margin-bottom: 1rem; }}
     .past-list {{ list-style: none; }}
     .past-item {{ margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #f0e8e0; }}
-    .past-link {{ font-size: 0.95rem; font-weight: 500; color: var(--fern); text-decoration: none; display: block; }}
+    .past-link {{ font-size: 1rem; font-weight: 500; color: var(--fern); text-decoration: none; display: block; }}
     .past-link:hover {{ text-decoration: underline; }}
-    .past-meta {{ font-size: 0.7rem; color: #aaa; margin-top: 0.25rem; }}
-    .past-badge {{ display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.5rem; border-radius: 12px; color: white; margin-right: 0.5rem; }}
-    .archive-month {{ margin-bottom: 1rem; }}
-    .archive-month-title {{ font-weight: 600; color: var(--moss); margin-bottom: 0.5rem; }}
-    .archive-list {{ list-style: none; padding-left: 0.5rem; }}
-    .archive-list li {{ margin-bottom: 0.3rem; }}
-    .archive-list a {{ color: var(--stone); text-decoration: none; font-size: 0.85rem; }}
-    .archive-list a:hover {{ color: var(--fern); text-decoration: underline; }}
+    .past-meta {{ font-size: 0.75rem; color: #aaa; margin-top: 0.25rem; }}
     
     @media (max-width: 768px) {{
-        .two-columns {{ flex-direction: column; }}
         .latest-title {{ font-size: 1.4rem; }}
         .daily-container {{ padding: 0 1rem; }}
     }}
@@ -869,33 +904,22 @@ def generate_daily_post_index(daily_post_dir):
             </div>
             
             <div class="categories">
-                <a href="plant.html" class="category-btn" style="text-decoration: none;">🌿 植物</a>
-                <a href="sustainability.html" class="category-btn" style="text-decoration: none;">♻️ 永續</a>
-                <a href="carbon.html" class="category-btn" style="text-decoration: none;">📊 碳盤查</a>
-                <a href="life.html" class="category-btn" style="text-decoration: none;">🏡 生活</a>
+                <a href="plant.html" class="category-btn">🌿 植物</a>
+                <a href="sustainability.html" class="category-btn">♻️ 永續</a>
+                <a href="carbon.html" class="category-btn">📊 碳盤查</a>
+                <a href="life.html" class="category-btn">🏡 生活</a>
             </div>
             
-            <div class="two-columns">
-                <div class="main-col">
-                    <div class="latest-article">
-                        <div class="latest-category">📌 {latest['category']}</div>
-                        <h1 class="latest-title">{latest['title']}</h1>
-                        <div class="latest-date">📅 {latest['date']}</div>
-                        <div class="latest-content">{latest['content']}</div>
-                        <a href="{latest['filename']}" class="read-more">🔗 查看獨立頁面 →</a>
-                    </div>
-                    
-                    <div class="section-title">📖 過往文章</div>
-                    <ul class="past-list" id="pastList">
-                        {past_list_html}
-                    </ul>
-                </div>
-                
-                <div class="sidebar-col">
-                    <div class="section-title">📚 歷史歸檔</div>
-                    {archive_html}
-                </div>
+            <div class="latest-article">
+                <h1 class="latest-title">{latest['title']}</h1>
+                <div class="latest-date">📅 {latest['date']} · {latest['category']}</div>
+                <a href="{latest['filename']}" class="read-more">🔗 閱讀全文 →</a>
             </div>
+            
+            <div class="section-title">📖 近期文章</div>
+            <ul class="past-list">
+                {past_list_html}
+            </ul>
         </div>
     </main>
     
@@ -912,99 +936,189 @@ def generate_daily_post_index(daily_post_dir):
         f.write(index_html)
     print(f"📑 已更新 daily-post/index.html (共 {len(articles)} 篇文章)")
     
-    # 為每個分類產生獨立頁面
+    # 為每個分類產生獨立頁面（含搜尋功能）
     categories_list = ["植物", "永續", "碳盤查", "生活"]
     category_emojis = {"植物": "🌿", "永續": "♻️", "碳盤查": "📊", "生活": "🏡"}
     category_files = {"植物": "plant.html", "永續": "sustainability.html", "碳盤查": "carbon.html", "生活": "life.html"}
     
-    for cat in categories_list:
-        cat_articles = [a for a in articles if a["category"] == cat]
+    # 準備搜尋用的 JSON 資料（所有文章）
+    search_json_data = []
+    for article in articles:
+        search_json_data.append({
+            "title": article["title"],
+            "category": article["category"],
+            "date": article["date"],
+            "filename": article["filename"]
+        })
+    search_json_str = json.dumps(search_json_data, ensure_ascii=False)
+    
+    for current_cat in categories_list:
+        cat_articles = [a for a in articles if a["category"] == current_cat]
         
-        cat_past_list_html = ""
+        # 其他三個分類的連結
+        other_cats = [c for c in categories_list if c != current_cat]
+        other_links_html = ""
+        for cat in other_cats:
+            cat_file = category_files[cat]
+            cat_emoji = category_emojis[cat]
+            other_links_html += f'<a href="{cat_file}" class="category-badge">{cat_emoji} {cat}</a>'
+        
+        # 文章列表 HTML
+        article_list_html = ""
         for article in cat_articles:
-            cat_color = CATEGORY_COLORS.get(article["category"], "#6c757d")
-            cat_past_list_html += f"""
-                        <li class="past-item">
-                            <span class="past-badge" style="background: {cat_color};">{article['category']}</span>
-                            <a class="past-link" href="{article['filename']}">{article['title']}</a>
-                            <div class="past-meta">📅 {article['date']}</div>
+            article_list_html += f"""
+                        <li class="article-list-item" data-title="{article['title']}" data-category="{article['category']}">
+                            <a href="{article['filename']}" class="article-title-link">{article['title']}</a>
+                            <span class="article-date">{article['date']}</span>
                         </li>"""
         
-        if not cat_past_list_html:
-            cat_past_list_html = '<li style="color: #aaa; text-align: center;">📭 暫無文章</li>'
-        
-        cat_latest = cat_articles[0] if cat_articles else None
-        
-        if cat_latest:
-            cat_latest_cat_color = CATEGORY_COLORS.get(cat_latest['category'], "#6c757d")
-            full_content = cat_latest.get('content', '')
-            plain_content = re.sub(r'<[^>]+>', '', full_content)
-            preview_length = min(300, len(plain_content))
-            preview_content = plain_content[:preview_length]
-            if len(plain_content) > preview_length:
-                preview_content += "..."
-            
-            cat_latest_html = f"""
-                    <div class="latest-article">
-                        <div class="latest-category" style="background: {cat_latest_cat_color};">📌 {cat_latest['category']}</div>
-                        <h1 class="latest-title">{cat_latest['title']}</h1>
-                        <div class="latest-date">📅 {cat_latest['date']}</div>
-                        <div class="latest-content">{preview_content}</div>
-                        <a href="{cat_latest['filename']}" class="read-more">🔗 閱讀全文 →</a>
-                    </div>"""
-        else:
-            cat_latest_html = '<div style="text-align:center;padding:40px;color:var(--stone);">📭 此分類尚無文章</div>'
+        if not article_list_html:
+            article_list_html = '<li class="empty-message">📭 此分類尚無文章</li>'
         
         cat_page_html = f"""<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{category_emojis[cat]} {cat}文章 - 蕨積每日文章</title>
+    <title>{category_emojis[current_cat]} {current_cat}文章 - 蕨積每日文章</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>{get_template_styles()}
-    .daily-container {{ max-width: 1200px; margin: 0 auto; padding: 0 2rem; }}
-    .page-header {{ text-align: center; margin-bottom: 2rem; }}
-    .page-header h1 {{ color: var(--moss); font-size: 2rem; font-family: 'Noto Serif TC', serif; }}
-    .page-header p {{ color: var(--stone); margin-top: 0.5rem; }}
-    
-    .two-columns {{ display: flex; gap: 2rem; flex-wrap: wrap; }}
-    .main-col {{ flex: 3; min-width: 250px; }}
-    
-    .latest-article {{
-        background: white;
-        border-radius: 16px;
-        padding: 2rem;
+    .category-container {{
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 0 2rem;
+    }}
+    .category-header {{
+        text-align: center;
         margin-bottom: 2rem;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
     }}
-    .latest-category {{
-        display: inline-block;
-        color: white;
-        padding: 0.2rem 0.8rem;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        margin-bottom: 1rem;
+    .category-header h1 {{
+        color: var(--moss);
+        font-size: 2rem;
+        font-family: 'Noto Serif TC', serif;
     }}
-    .latest-title {{ font-size: 1.8rem; color: var(--moss); margin-bottom: 0.5rem; }}
-    .latest-date {{ color: var(--stone); margin-bottom: 1.5rem; font-size: 0.9rem; }}
-    .latest-content {{ line-height: 1.8; }}
-    .read-more {{ display: inline-block; margin-top: 1rem; color: var(--fern); text-decoration: none; font-weight: 500; }}
+    .category-header p {{
+        color: var(--stone);
+        margin-top: 0.5rem;
+    }}
     
-    .section-title {{ font-size: 1.2rem; color: var(--moss); border-bottom: 2px solid #e0d6cc; padding-bottom: 0.5rem; margin-bottom: 1rem; }}
-    .past-list {{ list-style: none; }}
-    .past-item {{ margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #f0e8e0; }}
-    .past-link {{ font-size: 0.95rem; font-weight: 500; color: var(--fern); text-decoration: none; display: block; }}
-    .past-link:hover {{ text-decoration: underline; }}
-    .past-meta {{ font-size: 0.7rem; color: #aaa; margin-top: 0.25rem; }}
-    .past-badge {{ display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.5rem; border-radius: 12px; color: white; margin-right: 0.5rem; }}
+    .search-box {{
+        margin-bottom: 2rem;
+    }}
+    .search-input {{
+        width: 100%;
+        padding: 0.8rem 1rem;
+        font-size: 1rem;
+        border: 1px solid #e0d6cc;
+        border-radius: 40px;
+        background: white;
+        font-family: 'Noto Sans TC', sans-serif;
+        transition: all 0.2s;
+    }}
+    .search-input:focus {{
+        outline: none;
+        border-color: var(--fern);
+        box-shadow: 0 0 0 3px rgba(90,122,74,0.1);
+    }}
+    
+    .other-categories {{
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid #f0e8e0;
+    }}
+    .category-badge {{
+        display: inline-block;
+        padding: 0.4rem 1.2rem;
+        background: #e8e0d8;
+        color: #4a5b4e;
+        border-radius: 30px;
+        text-decoration: none;
+        font-size: 0.85rem;
+        font-weight: 500;
+        transition: all 0.2s;
+    }}
+    .category-badge:hover {{
+        background: var(--fern);
+        color: white;
+        transform: translateY(-2px);
+    }}
+    
+    .section-title {{
+        font-size: 1.2rem;
+        color: var(--moss);
+        border-bottom: 2px solid #e0d6cc;
+        padding-bottom: 0.5rem;
+        margin-bottom: 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+    }}
+    .result-count {{
+        font-size: 0.8rem;
+        color: var(--stone);
+        font-weight: normal;
+    }}
+    .article-list {{
+        list-style: none;
+    }}
+    .article-list-item {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.8rem 0;
+        border-bottom: 1px solid #f0e8e0;
+        transition: background 0.2s;
+    }}
+    .article-list-item:hover {{
+        background: #faf7f2;
+        padding-left: 0.5rem;
+    }}
+    .article-title-link {{
+        font-size: 1rem;
+        font-weight: 500;
+        color: var(--fern);
+        text-decoration: none;
+        flex: 1;
+    }}
+    .article-title-link:hover {{
+        text-decoration: underline;
+    }}
+    .article-date {{
+        font-size: 0.75rem;
+        color: #aaa;
+        font-family: monospace;
+        margin-left: 1rem;
+        white-space: nowrap;
+    }}
+    .empty-message {{
+        text-align: center;
+        color: var(--stone);
+        padding: 2rem;
+    }}
+    .no-results {{
+        text-align: center;
+        color: var(--stone);
+        padding: 2rem;
+        font-style: italic;
+    }}
     
     @media (max-width: 768px) {{
-        .two-columns {{ flex-direction: column; }}
-        .latest-title {{ font-size: 1.4rem; }}
-        .daily-container {{ padding: 0 1rem; }}
+        .category-container {{ padding: 0 1rem; }}
+        .article-list-item {{
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.3rem;
+        }}
+        .article-date {{
+            margin-left: 0;
+            font-size: 0.7rem;
+        }}
     }}
     </style>
 </head>
@@ -1012,22 +1126,28 @@ def generate_daily_post_index(daily_post_dir):
     <div id="nav-placeholder"></div>
     
     <main class="content">
-        <div class="daily-container">
-            <div class="page-header">
-                <h1>{category_emojis[cat]} {cat}文章</h1>
-                <p>蕨積每日文章 - {cat}分類精選</p>
+        <div class="category-container">
+            <div class="category-header">
+                <h1>{category_emojis[current_cat]} {current_cat}文章</h1>
+                <p>蕨積每日文章 - {current_cat}分類精選</p>
             </div>
             
-            <div class="two-columns">
-                <div class="main-col">
-                    {cat_latest_html}
-                    
-                    <div class="section-title">📖 過往文章</div>
-                    <ul class="past-list">
-                        {cat_past_list_html}
-                    </ul>
-                </div>
+            <div class="search-box">
+                <input type="text" id="searchInput" class="search-input" placeholder="🔍 搜尋標題或分類... (即時篩選)" autocomplete="off">
             </div>
+            
+            <div class="other-categories">
+                {other_links_html}
+            </div>
+            
+            <div class="section-title">
+                <span>📖 文章列表</span>
+                <span class="result-count" id="resultCount">共 {len(cat_articles)} 篇</span>
+            </div>
+            
+            <ul class="article-list" id="articleList">
+                {article_list_html}
+            </ul>
         </div>
     </main>
     
@@ -1035,14 +1155,55 @@ def generate_daily_post_index(daily_post_dir):
     
     <script>
         {get_nav_script()}
+        
+        const searchInput = document.getElementById('searchInput');
+        const articleList = document.getElementById('articleList');
+        const resultCount = document.getElementById('resultCount');
+        
+        const allArticles = {search_json_str};
+        const currentCategory = '{current_cat}';
+        
+        function renderFilteredArticles(keyword) {{
+            let filtered = allArticles.filter(article => article.category === currentCategory);
+            
+            if (keyword.trim() !== '') {{
+                const lowerKeyword = keyword.toLowerCase();
+                filtered = allArticles.filter(article => 
+                    article.title.toLowerCase().includes(lowerKeyword) || 
+                    article.category.toLowerCase().includes(lowerKeyword)
+                );
+            }}
+            
+            resultCount.textContent = `共 ${{filtered.length}} 篇`;
+            
+            if (filtered.length === 0) {{
+                articleList.innerHTML = '<li class="no-results">🔍 沒有找到相關文章，試試其他關鍵字～</li>';
+                return;
+            }}
+            
+            let html = '';
+            filtered.forEach(article => {{
+                html += `
+                    <li class="article-list-item">
+                        <a href="${{article.filename}}" class="article-title-link">${{article.title}}</a>
+                        <span class="article-date">${{article.date}}</span>
+                    </li>
+                `;
+            }});
+            articleList.innerHTML = html;
+        }}
+        
+        searchInput.addEventListener('input', (e) => {{
+            renderFilteredArticles(e.target.value);
+        }});
     </script>
 </body>
 </html>"""
         
-        cat_filepath = os.path.join(daily_post_dir, category_files[cat])
+        cat_filepath = os.path.join(daily_post_dir, category_files[current_cat])
         with open(cat_filepath, "w", encoding="utf-8") as f:
             f.write(cat_page_html)
-        print(f"📁 已產生分類頁面：{category_files[cat]}")
+        print(f"📁 已產生分類頁面：{category_files[current_cat]} (含搜尋功能)")
 
 # ==================== 推送 ====================
 def commit_and_push_to_website():
@@ -1085,7 +1246,7 @@ def commit_and_push_to_website():
         
         print(f"✅ 已複製 {copied_count} 篇文章到 daily-post")
         
-        # 產生 index
+        # 產生 index 和分類頁面
         generate_daily_post_index(daily_dir)
         
         # Git 設定
