@@ -745,7 +745,7 @@ def save_article_as_html(title, content, category, summary, key_points, output_d
             <div class="article-footer">
                 <p style="color: var(--stone); font-size: 0.85rem;">🌿 每日一篇，與你一起成長</p>
                 <div class="back-links">
-                    <a href="index.html">🏠 返回首頁</a>
+                    <a href="index.html">🏠 返回每日文章</a>
                     <a href="{category_page}">📂 返回{category}分類</a>
                     <a href="../shop.html">🌱 植物選品</a>
                     <a href="../consult.html">💚 綠色服務</a>
