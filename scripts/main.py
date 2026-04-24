@@ -764,55 +764,195 @@ def save_article_as_html(title, content, category, summary, key_points, output_d
     return filepath
 
 # ==================== 索引頁面生成 ====================
-def generate_daily_post_index(daily_post_dir):
-    """產生 daily-post 目錄的索引頁面 + 分類頁面（乾淨標題列表 + 即時搜尋）"""
-    articles = []
-    for file in os.listdir(daily_post_dir):
-        if file.endswith(".html") and file != "index.html" and len(file) >= 10 and file[4] == '-' and file[7] == '-':
-            filepath = os.path.join(daily_post_dir, file)
-            category = "未分類"
-            title = ""
-            date_str = file[:10]
-            try:
-                with open(filepath, "r", encoding="utf-8") as f:
-                    full_content = f.read()
-                    match_cat = re.search(r'<div class="article-category">📌 (.+?)</div>', full_content)
-                    if match_cat:
-                        category = match_cat.group(1)
-                    match_title = re.search(r'<h1 class="article-title">(.+?)</h1>', full_content)
-                    if match_title:
-                        title = match_title.group(1)
-            except:
-                title = file.replace(".html", "").replace(date_str + "-", "").replace("-", " / ")
-            articles.append({
-                "filename": file,
-                "date": date_str,
-                "title": title,
-                "category": category
-            })
-    articles.sort(key=lambda x: x["date"], reverse=True)
-
-    if not articles:
-        empty_html = f"""<!DOCTYPE html>
+    # 產生主索引頁面（最新文章全文 + 近期文章 + 右側邊欄）
+    latest = articles[0]
+    past_articles = articles[1:]
+    
+    # 直接使用完整內容（保留 HTML 格式）
+    full_content_html = latest.get('content', '')
+    
+    # 右側熱門分類與連結
+    sidebar_html = f"""
+                    <div class="sidebar-col">
+                        <div class="sidebar-card">
+                            <h3>🌿 分類瀏覽</h3>
+                            <ul class="sidebar-links">
+                                <li><a href="plant.html">🌱 植物文章</a></li>
+                                <li><a href="sustainability.html">♻️ 永續文章</a></li>
+                                <li><a href="carbon.html">📊 碳盤查文章</a></li>
+                                <li><a href="life.html">🏡 生活文章</a></li>
+                            </ul>
+                        </div>
+                        <div class="sidebar-card">
+                            <h3>📅 最新文章</h3>
+                            <ul class="sidebar-links">
+                                <li><a href="{latest['filename']}">{latest['title']}</a></li>
+                    """
+    for article in past_articles[:5]:
+        sidebar_html += f'<li><a href="{article["filename"]}">{article["title"]}</a></li>'
+    sidebar_html += """
+                            </ul>
+                        </div>
+                    </div>"""
+    
+    # 過往文章列表
+    past_list_html = ""
+    for article in past_articles[:30]:
+        past_list_html += f"""
+                        <li class="past-item">
+                            <a class="past-link" href="{article['filename']}">{article['title']}</a>
+                            <div class="past-meta">📅 {article['date']} · {article['category']}</div>
+                        </li>"""
+    
+    index_html = f"""<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>蕨積每日文章</title>
+    <title>蕨積每日文章 - 植物・永續・碳盤查・生活</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
-    <style>{get_template_styles()}</style>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>{get_template_styles()}
+    .daily-container {{ max-width: 1200px; margin: 0 auto; padding: 0 2rem; }}
+    .page-header {{ text-align: center; margin-bottom: 2rem; }}
+    .page-header h1 {{ color: var(--moss); font-size: 2rem; font-family: 'Noto Serif TC', serif; }}
+    .page-header p {{ color: var(--stone); margin-top: 0.5rem; }}
+    
+    .two-columns {{ display: flex; gap: 2rem; flex-wrap: wrap; }}
+    .main-col {{ flex: 3; min-width: 250px; }}
+    .sidebar-col {{ flex: 1; min-width: 220px; }}
+    
+    .latest-article {{
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }}
+    .latest-category {{
+        display: inline-block;
+        background: {CATEGORY_COLORS.get(latest['category'], '#4a7c59')};
+        color: white;
+        padding: 0.2rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        margin-bottom: 1rem;
+    }}
+    .latest-title {{ font-size: 1.8rem; color: var(--moss); margin-bottom: 0.5rem; }}
+    .latest-date {{ color: var(--stone); margin-bottom: 1.5rem; font-size: 0.9rem; }}
+    .latest-content {{
+        line-height: 1.8;
+        font-size: 1rem;
+        color: #333;
+    }}
+    .latest-content h2 {{
+        font-size: 1.4rem;
+        margin: 1.2rem 0 0.8rem 0;
+        color: var(--moss);
+        border-left: 4px solid {CATEGORY_COLORS.get(latest['category'], '#4a7c59')};
+        padding-left: 1rem;
+    }}
+    .latest-content h3 {{
+        font-size: 1.2rem;
+        margin: 1rem 0 0.5rem 0;
+        color: var(--fern);
+    }}
+    .latest-content p {{
+        margin-bottom: 0.8rem;
+    }}
+    .latest-content ul, .latest-content ol {{
+        margin: 0.8rem 0 0.8rem 1.5rem;
+    }}
+    .latest-content li {{
+        margin-bottom: 0.3rem;
+    }}
+    .read-more {{ display: inline-block; margin-top: 1rem; color: var(--fern); text-decoration: none; font-weight: 500; }}
+    
+    .section-title {{ font-size: 1.2rem; color: var(--moss); border-bottom: 2px solid #e0d6cc; padding-bottom: 0.5rem; margin-bottom: 1rem; }}
+    .past-list {{ list-style: none; }}
+    .past-item {{ margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #f0e8e0; }}
+    .past-link {{ font-size: 1rem; font-weight: 500; color: var(--fern); text-decoration: none; display: block; }}
+    .past-link:hover {{ text-decoration: underline; }}
+    .past-meta {{ font-size: 0.75rem; color: #aaa; margin-top: 0.25rem; }}
+    
+    .sidebar-card {{
+        background: white;
+        border-radius: 16px;
+        padding: 1.2rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }}
+    .sidebar-card h3 {{
+        font-size: 1rem;
+        color: var(--moss);
+        margin-bottom: 0.8rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e0d6cc;
+    }}
+    .sidebar-links {{
+        list-style: none;
+    }}
+    .sidebar-links li {{
+        margin-bottom: 0.5rem;
+    }}
+    .sidebar-links a {{
+        color: var(--stone);
+        text-decoration: none;
+        font-size: 0.85rem;
+        transition: color 0.2s;
+    }}
+    .sidebar-links a:hover {{
+        color: var(--fern);
+        text-decoration: underline;
+    }}
+    
+    @media (max-width: 768px) {{
+        .two-columns {{ flex-direction: column; }}
+        .latest-title {{ font-size: 1.4rem; }}
+        .daily-container {{ padding: 0 1rem; }}
+        .latest-article {{ padding: 1rem; }}
+        .latest-content h2 {{ font-size: 1.2rem; }}
+    }}
+    </style>
 </head>
 <body>
     <div id="nav-placeholder"></div>
+    
     <main class="content">
-        <div style="text-align:center;padding:60px 20px;">
-            <h1 style="font-family:'Noto Serif TC',serif;color:var(--moss);">🌿 蕨積每日文章</h1>
-            <p style="color:var(--stone);margin-top:1rem;">📭 目前還沒有文章，等待機器人發文中...</p>
+        <div class="daily-container">
+            <div class="page-header">
+                <h1>🌿 蕨積每日文章</h1>
+                <p>植物・永續・碳盤查・生活 — 每天一篇，與你一起成長</p>
+            </div>
+            
+            <div class="two-columns">
+                <div class="main-col">
+                    <div class="latest-article">
+                        <div class="latest-category">📌 {latest['category']}</div>
+                        <h1 class="latest-title">{latest['title']}</h1>
+                        <div class="latest-date">📅 {latest['date']}</div>
+                        <div class="latest-content">
+                            {full_content_html}
+                        </div>
+                    </div>
+                    
+                    <div class="section-title">📖 近期文章</div>
+                    <ul class="past-list">
+                        {past_list_html}
+                    </ul>
+                </div>
+                
+                {sidebar_html}
+            </div>
         </div>
     </main>
+    
     {get_footer_html()}
-    <script>{get_nav_script()}</script>
+    
+    <script>
+        {get_nav_script()}
+    </script>
 </body>
 </html>"""
         with open(os.path.join(daily_post_dir, "index.html"), "w", encoding="utf-8") as f:
@@ -1004,23 +1144,29 @@ def generate_daily_post_index(daily_post_dir):
         margin-top: 0.5rem;
     }}
     
-    .search-box {{
-        margin-bottom: 2rem;
+        .search-box {{
+        max-width: 320px;
+        margin: 0 auto 2rem auto;
     }}
     .search-input {{
         width: 100%;
-        padding: 0.8rem 1rem;
-        font-size: 1rem;
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
         border: 1px solid #e0d6cc;
         border-radius: 40px;
         background: white;
         font-family: 'Noto Sans TC', sans-serif;
         transition: all 0.2s;
+        text-align: center;
     }}
     .search-input:focus {{
         outline: none;
         border-color: var(--fern);
         box-shadow: 0 0 0 3px rgba(90,122,74,0.1);
+    }}
+    .search-input::placeholder {{
+        text-align: center;
+        font-size: 0.85rem;
     }}
     
     .other-categories {{
