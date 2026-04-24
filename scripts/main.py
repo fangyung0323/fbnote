@@ -764,7 +764,72 @@ def save_article_as_html(title, content, category, summary, key_points, output_d
     return filepath
 
 # ==================== 索引頁面生成 ====================
-    # 產生主索引頁面（最新文章全文 + 近期文章 + 右側邊欄）
+def generate_daily_post_index(daily_post_dir):
+    """產生 daily-post 目錄的索引頁面 + 分類頁面（乾淨標題列表 + 即時搜尋）"""
+    
+    # ========== 第一步：讀取所有文章 ==========
+    articles = []
+    for file in os.listdir(daily_post_dir):
+        if file.endswith(".html") and file != "index.html" and len(file) >= 10 and file[4] == '-' and file[7] == '-':
+            filepath = os.path.join(daily_post_dir, file)
+            category = "未分類"
+            title = ""
+            content = ""
+            date_str = file[:10]
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    full_content = f.read()
+                    match_cat = re.search(r'<div class="article-category">📌 (.+?)</div>', full_content)
+                    if match_cat:
+                        category = match_cat.group(1)
+                    match_title = re.search(r'<h1 class="article-title">(.+?)</h1>', full_content)
+                    if match_title:
+                        title = match_title.group(1)
+                    # 讀取文章內容（用於首頁全文顯示）
+                    match_content = re.search(r'<div class="article-content">(.*?)</div>', full_content, re.DOTALL)
+                    if match_content:
+                        content = match_content.group(1)
+            except:
+                title = file.replace(".html", "").replace(date_str + "-", "").replace("-", " / ")
+            articles.append({
+                "filename": file,
+                "date": date_str,
+                "title": title,
+                "category": category,
+                "content": content
+            })
+    articles.sort(key=lambda x: x["date"], reverse=True)
+    
+    # ========== 第二步：處理無文章情況 ==========
+    if not articles:
+        empty_html = f"""<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>蕨積每日文章</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
+    <style>{get_template_styles()}</style>
+</head>
+<body>
+    <div id="nav-placeholder"></div>
+    <main class="content">
+        <div style="text-align:center;padding:60px 20px;">
+            <h1 style="font-family:'Noto Serif TC',serif;color:var(--moss);">🌿 蕨積每日文章</h1>
+            <p style="color:var(--stone);margin-top:1rem;">📭 目前還沒有文章，等待機器人發文中...</p>
+        </div>
+    </main>
+    {get_footer_html()}
+    <script>{get_nav_script()}</script>
+</body>
+</html>"""
+        with open(os.path.join(daily_post_dir, "index.html"), "w", encoding="utf-8") as f:
+            f.write(empty_html)
+        print("📑 已更新 daily-post/index.html (無文章)")
+        return
+    
+    # ========== 第三步：產生主索引頁面（最新文章全文 + 近期文章 + 右側邊欄）==========
     latest = articles[0]
     past_articles = articles[1:]
     
@@ -867,7 +932,6 @@ def save_article_as_html(title, content, category, summary, key_points, output_d
     .latest-content li {{
         margin-bottom: 0.3rem;
     }}
-    .read-more {{ display: inline-block; margin-top: 1rem; color: var(--fern); text-decoration: none; font-weight: 500; }}
     
     .section-title {{ font-size: 1.2rem; color: var(--moss); border-bottom: 2px solid #e0d6cc; padding-bottom: 0.5rem; margin-bottom: 1rem; }}
     .past-list {{ list-style: none; }}
@@ -955,128 +1019,13 @@ def save_article_as_html(title, content, category, summary, key_points, output_d
     </script>
 </body>
 </html>"""
-        with open(os.path.join(daily_post_dir, "index.html"), "w", encoding="utf-8") as f:
-            f.write(empty_html)
-        print("📑 已更新 daily-post/index.html (無文章)")
-        return
-
-    # 產生主索引頁面
-    latest = articles[0]
-    past_articles = articles[1:]
     
-    past_list_html = ""
-    for article in past_articles[:30]:
-        past_list_html += f"""
-                        <li class="past-item">
-                            <a class="past-link" href="{article['filename']}">{article['title']}</a>
-                            <div class="past-meta">📅 {article['date']} · {article['category']}</div>
-                        </li>"""
-    
-    index_html = f"""<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>蕨積每日文章 - 植物・永續・碳盤查・生活</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>{get_template_styles()}
-    .daily-container {{ max-width: 1000px; margin: 0 auto; padding: 0 2rem; }}
-    .page-header {{ text-align: center; margin-bottom: 2rem; }}
-    .page-header h1 {{ color: var(--moss); font-size: 2rem; font-family: 'Noto Serif TC', serif; }}
-    .page-header p {{ color: var(--stone); margin-top: 0.5rem; }}
-    
-    .categories {{
-        display: flex;
-        justify-content: center;
-        gap: 1rem;
-        flex-wrap: wrap;
-        margin-bottom: 2rem;
-    }}
-    .category-btn {{
-        padding: 0.5rem 1.5rem;
-        border-radius: 30px;
-        border: none;
-        cursor: pointer;
-        font-size: 0.9rem;
-        font-weight: 500;
-        transition: transform 0.2s;
-        background: #e8e0d8;
-        color: #4a5b4e;
-        text-decoration: none;
-        display: inline-block;
-    }}
-    .category-btn:hover {{ transform: translateY(-2px); background: #4a7c59; color: white; }}
-    
-    .latest-article {{
-        background: white;
-        border-radius: 16px;
-        padding: 2rem;
-        margin-bottom: 2rem;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-    }}
-    .latest-title {{ font-size: 1.8rem; color: var(--moss); margin-bottom: 0.5rem; }}
-    .latest-date {{ color: var(--stone); margin-bottom: 1rem; font-size: 0.9rem; }}
-    .read-more {{ display: inline-block; margin-top: 1rem; color: var(--fern); text-decoration: none; font-weight: 500; }}
-    
-    .section-title {{ font-size: 1.2rem; color: var(--moss); border-bottom: 2px solid #e0d6cc; padding-bottom: 0.5rem; margin-bottom: 1rem; }}
-    .past-list {{ list-style: none; }}
-    .past-item {{ margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #f0e8e0; }}
-    .past-link {{ font-size: 1rem; font-weight: 500; color: var(--fern); text-decoration: none; display: block; }}
-    .past-link:hover {{ text-decoration: underline; }}
-    .past-meta {{ font-size: 0.75rem; color: #aaa; margin-top: 0.25rem; }}
-    
-    @media (max-width: 768px) {{
-        .latest-title {{ font-size: 1.4rem; }}
-        .daily-container {{ padding: 0 1rem; }}
-    }}
-    </style>
-</head>
-<body>
-    <div id="nav-placeholder"></div>
-    
-    <main class="content">
-        <div class="daily-container">
-            <div class="page-header">
-                <h1>🌿 蕨積每日文章</h1>
-                <p>植物・永續・碳盤查・生活 — 每天一篇，與你一起成長</p>
-            </div>
-            
-            <div class="categories">
-                <a href="plant.html" class="category-btn">🌿 植物</a>
-                <a href="sustainability.html" class="category-btn">♻️ 永續</a>
-                <a href="carbon.html" class="category-btn">📊 碳盤查</a>
-                <a href="life.html" class="category-btn">🏡 生活</a>
-            </div>
-            
-            <div class="latest-article">
-                <h1 class="latest-title">{latest['title']}</h1>
-                <div class="latest-date">📅 {latest['date']} · {latest['category']}</div>
-                <a href="{latest['filename']}" class="read-more">🔗 閱讀全文 →</a>
-            </div>
-            
-            <div class="section-title">📖 近期文章</div>
-            <ul class="past-list">
-                {past_list_html}
-            </ul>
-        </div>
-    </main>
-    
-    {get_footer_html()}
-    
-    <script>
-        {get_nav_script()}
-    </script>
-</body>
-</html>"""
-
     index_path = os.path.join(daily_post_dir, "index.html")
     with open(index_path, "w", encoding="utf-8") as f:
         f.write(index_html)
     print(f"📑 已更新 daily-post/index.html (共 {len(articles)} 篇文章)")
     
-    # 為每個分類產生獨立頁面（含搜尋功能）
+    # ========== 第四步：為每個分類產生獨立頁面（含搜尋功能）==========
     categories_list = ["植物", "永續", "碳盤查", "生活"]
     category_emojis = {"植物": "🌿", "永續": "♻️", "碳盤查": "📊", "生活": "🏡"}
     category_files = {"植物": "plant.html", "永續": "sustainability.html", "碳盤查": "carbon.html", "生活": "life.html"}
@@ -1144,7 +1093,7 @@ def save_article_as_html(title, content, category, summary, key_points, output_d
         margin-top: 0.5rem;
     }}
     
-        .search-box {{
+    .search-box {{
         max-width: 320px;
         margin: 0 auto 2rem auto;
     }}
@@ -1350,7 +1299,6 @@ def save_article_as_html(title, content, category, summary, key_points, output_d
         with open(cat_filepath, "w", encoding="utf-8") as f:
             f.write(cat_page_html)
         print(f"📁 已產生分類頁面：{category_files[current_cat]} (含搜尋功能)")
-
 # ==================== 推送 ====================
 def commit_and_push_to_website():
     """推送到網站倉庫"""
