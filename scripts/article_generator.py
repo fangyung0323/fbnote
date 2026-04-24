@@ -39,8 +39,8 @@ def generate_article():
         structure = random.choice(DEFAULT_STRUCTURES)
         print(f"📐 隨機結構：{structure}")
 
-    # ✅ 修改 prompt：明確要求 JSON 格式，包含 summary 和 key_points
-    prompt = f"""請寫一篇關於「{category}」的科普或生活文章。
+    # ✅ 強化版 Prompt
+    prompt = f"""請寫一篇關於「{category}」的專業科普或生活文章。
 
 今天的主題是：{subtopic}
 
@@ -48,18 +48,30 @@ def generate_article():
 
 文章結構：{structure}
 
-【重要】請以 JSON 格式輸出，包含以下欄位：
-- title: 文章標題（15字以內，吸引人）
-- summary: 一句話總結（30字以內，讓人想點進來）
+【嚴格要求】
+1. 文章長度：**至少 600 字，最多 900 字**（請確實遵守）
+2. 內容必須包含：
+   - 具體的實例或案例（至少 1 個）
+   - 可操作的建議或步驟（至少 3 點）
+   - 數據或研究發現（可合理推估，但要具體）
+3. 結尾要有總結段落
+
+【輸出格式】請以 JSON 格式輸出，包含以下欄位：
+- title: 文章標題（12字以內，要吸引人）
+- summary: 一句話總結（25字以內）
 - key_points: 三個重點，格式為 ["重點一", "重點二", "重點三"]
 - content: 文章內文（使用 HTML 格式，包含 <h2>、<p> 標籤）
 
-要求：
-1. 文章長度約 500-800 字
-2. 語言使用繁體中文
-3. 結尾加上「🌿 蕨積 - 讓生活多一點綠」
-4. 不要使用 Markdown 語法（不要用 **bold**、# 標題）
-5. 不要輸出 JSON 以外的任何文字
+【內容品質要求】
+- 不要空泛的廢話，每段都要有實質內容
+- 不要重複同樣的觀點
+- 使用繁體中文，語氣自然流暢
+- 結尾加上「🌿 蕨積 - 讓生活多一點綠」
+
+【禁止事項】
+- 禁止使用 Markdown 語法（不要用 **bold**、# 標題）
+- 禁止輸出 JSON 以外的任何文字
+- 禁止寫「總之」、「綜上所述」這類敷衍結尾
 """
 
     headers = {
@@ -67,24 +79,24 @@ def generate_article():
         "Content-Type": "application/json"
     }
 
+    # ✅ 調整參數：降低溫度提高專注度，提高 max_tokens 給更多空間
     payload = {
         "model": "deepseek-chat",
         "messages": [
             {"role": "system", "content": role_prompt},
             {"role": "user", "content": prompt}
         ],
-        "temperature": 0.7,
-        "max_tokens": 2000,
-        "response_format": {"type": "json_object"}  # ✅ 強制 JSON 輸出
+        "temperature": 0.5,      # 從 0.7 調低，讓 AI 更專注
+        "max_tokens": 2500,      # 從 2000 調高，留更多空間
+        "response_format": {"type": "json_object"}
     }
 
     print("🤖 正在呼叫 DeepSeek API 生成文章...")
     try:
-        response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=60)
+        response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=90)  # timeout 延長到 90 秒
         response.raise_for_status()
         data = response.json()
         
-        # ✅ 解析 JSON
         article_data = json.loads(data["choices"][0]["message"]["content"])
         
         title = article_data.get("title", "")
@@ -92,7 +104,7 @@ def generate_article():
         key_points = article_data.get("key_points", [])
         content = article_data.get("content", "")
         
-        # ✅ 清理可能殘留的 Markdown
+        # 清理可能殘留的 Markdown
         content = re.sub(r'\*\*(.+?)\*\*', r'\1', content)
         content = re.sub(r'\*(.+?)\*', r'\1', content)
         content = re.sub(r'^#{1,6}\s+', '', content, flags=re.MULTILINE)
@@ -101,13 +113,27 @@ def generate_article():
         if not title:
             title = f"{category}｜{subtopic[:20]}"
         
-        # 確保 key_points 是列表
+        # 確保 key_points 是列表且為 3 個
         if not isinstance(key_points, list):
             key_points = []
+        while len(key_points) < 3:
+            key_points.append("更多精彩內容請看內文")
+        key_points = key_points[:3]
+        
+        # ✅ 品質檢查：文章長度
+        content_text = re.sub(r'<[^>]+>', '', content)  # 移除 HTML 標籤
+        word_count = len(content_text)
         
         print(f"✅ 文章生成成功：{title}")
         print(f"📂 類別：{category}")
-        print(f"📝 摘要：{summary[:50]}..." if summary else "⚠️ 無摘要")
+        print(f"📏 文章長度：{word_count} 字")
+        
+        if word_count < 400:
+            print(f"⚠️ 警告：文章太短（{word_count}字），建議檢查內容品質")
+        elif word_count < 600:
+            print(f"📌 提示：文章長度略低於目標（600-800），勉強接受")
+        else:
+            print(f"✨ 文章長度符合目標（600-800字）")
         
         return {
             "title": title,
@@ -119,7 +145,10 @@ def generate_article():
         
     except json.JSONDecodeError as e:
         print(f"❌ JSON 解析失敗：{e}")
-        print(f"原始回應：{data['choices'][0]['message']['content'][:200]}...")
+        print(f"原始回應前 500 字：{data['choices'][0]['message']['content'][:500]}...")
+        return None
+    except requests.exceptions.Timeout:
+        print("❌ API 呼叫超時（90秒），請稍後重試")
         return None
     except Exception as e:
         print(f"❌ API 呼叫失敗：{e}")
