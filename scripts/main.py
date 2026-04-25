@@ -530,7 +530,7 @@ def get_footer_html():
 def get_nav_script():
     return r"""
 document.addEventListener('DOMContentLoaded', function () {
-  fetch('/nav.html')
+  fetch('../nav.html')
     .then(response => response.text())
     .then(data => {
       let fixedData = data.replace(/href="(?!https?:\/\/|\/)([^"]+)"/g, 'href="/$1"');
