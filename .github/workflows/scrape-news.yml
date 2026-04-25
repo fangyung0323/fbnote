@@ -2,9 +2,12 @@ name: 每日爬取 ESG 新聞
 
 on:
   schedule:
-    # 每天台灣時間早上 6 點和下午 6 點執行
     - cron: '22 22,10 * * *'
-  workflow_dispatch:  # 允許手動觸發
+  workflow_dispatch:
+
+# ✅ 加入這段：給予寫入權限
+permissions:
+  contents: write
 
 jobs:
   scrape:
