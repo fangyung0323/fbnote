@@ -1,0 +1,7 @@
+# Python
+__pycache__/
+*.pyc
+
+# 新聞資料（如果不想提交到 Git，可以取消註解）
+# news-data/
+# news-pages/
