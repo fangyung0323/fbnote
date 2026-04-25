@@ -533,15 +533,13 @@ document.addEventListener('DOMContentLoaded', function () {
   fetch('../nav.html')
     .then(response => response.text())
     .then(data => {
-      let fixedData = data.replace(/href="(?!https?:\/\/|\/)([^"]+)"/g, 'href="/$1"');
-      fixedData = fixedData.replace(/href="\/([^"]+)"/g, 'href="/$1"');
-      document.getElementById('nav-placeholder').innerHTML = fixedData;
+      document.getElementById('nav-placeholder').innerHTML = data;
       initNav();
     })
     .catch(err => {
       console.error('無法載入導覽列:', err);
       document.getElementById('nav-placeholder').innerHTML = 
-        '<nav style="background:var(--moss);color:white;padding:0 4vw;height:72px;display:flex;align-items:center;">' +
+        '<nav style="background:#3d5a38;color:white;padding:0 4vw;height:72px;display:flex;align-items:center;">' +
         '<span style="font-family:Noto Serif TC,serif;font-weight:900;">🌿 蕨積</span>' +
         '</nav>';
     });
@@ -549,44 +547,36 @@ document.addEventListener('DOMContentLoaded', function () {
   function initNav() {
     var btn = document.getElementById('hamburger');
     var menu = document.getElementById('mobileMenu');
+    
     if (btn && menu) {
       btn.addEventListener('click', function () {
         btn.classList.toggle('open');
         menu.classList.toggle('open');
       });
-      menu.querySelectorAll('.mobile-link').forEach(function (a) {
-        a.addEventListener('click', function () {
-          btn.classList.remove('open');
-          menu.classList.remove('open');
-        });
-      });
     }
-    if (menu) {
-      menu.querySelectorAll('.mobile-parent').forEach(function (parent) {
-        parent.addEventListener('click', function () {
-          var id = parent.getAttribute('data-target');
-          var sub = document.getElementById(id);
-          var caretId = 'caret-' + id.replace('sub-', '');
-          var caret = document.getElementById(caretId);
-          var opening = !sub.classList.contains('open');
-          menu.querySelectorAll('.mobile-sub').forEach(function (s) { s.classList.remove('open'); });
-          menu.querySelectorAll('.mobile-caret').forEach(function (c) { c.classList.remove('open'); });
-          if (opening) {
-            sub.classList.add('open');
-            if (caret) caret.classList.add('open');
-          }
-        });
+    
+    var parents = document.querySelectorAll('.mobile-parent');
+    parents.forEach(function(parent) {
+      parent.addEventListener('click', function() {
+        var targetId = parent.getAttribute('data-target');
+        var sub = document.getElementById(targetId);
+        var caret = parent.querySelector('.mobile-caret');
+        if (sub) {
+          sub.classList.toggle('open');
+          if (caret) caret.classList.toggle('open');
+        }
       });
-    }
-    window.addEventListener('scroll', function () {
+    });
+    
+    window.addEventListener('scroll', function() {
       var nav = document.getElementById('mainNav');
       if (nav) nav.classList.toggle('scrolled', window.scrollY > 20);
     });
+    
     if (typeof lucide !== 'undefined') lucide.createIcons();
-  });
+  }
 });
 """
-
 # ==================== 文章生成（核心修改：加入新聞參考資料） ====================
 def generate_article():
     """调用 DeepSeek API 生成文章内容，回傳 dict（包含 title, content, category, summary, key_points）"""
