@@ -15,13 +15,28 @@ def generate_article():
         role_prompt = DEFAULT_ROLES.get(category, "你是一位科普作家。")
         print(f"🎭 預設角色（{category}）")
 
-    # 決定子主題
+    # ==================== 核心修改：優先從新聞讀取主題 ====================
+    news_context = None
+    subtopic = None
+    
+    # 檢查是否有手動指定主題（手動模式優先）
     if custom["topics"].get(category):
         subtopic = custom["topics"][category]
         print(f"🌱 手動主題：{subtopic}")
     else:
-        subtopic = random.choice(SUB_TOPICS.get(category, ["一般主題"]))
-        print(f"🌱 隨機主題：{subtopic}")
+        # 嘗試從爬蟲新聞讀取
+        news_data = get_news_based_topic(category)
+        
+        if news_data:
+            # 有新聞資料，使用新聞主題
+            subtopic = news_data["topic"]
+            news_context = news_data["news_context"]
+            print(f"📰 新聞主題：{subtopic}")
+            print(f"📰 新聞來源：{news_data.get('source', '未知')} ({news_data.get('date', '日期不詳')})")
+        else:
+            # 沒有新聞資料，回退到內建主題庫
+            subtopic = random.choice(SUB_TOPICS.get(category, ["一般主題"]))
+            print(f"🌱 隨機主題（內建）：{subtopic}")
 
     # 決定寫作風格
     if custom["style"]:
@@ -39,8 +54,30 @@ def generate_article():
         structure = random.choice(DEFAULT_STRUCTURES)
         print(f"📐 隨機結構：{structure}")
 
-    # ✅ 強化版 Prompt
+    # ==================== 建構 Prompt（加入新聞參考資料） ====================
+    
+    # 新聞參考區塊（如果有的話）
+    news_section = ""
+    if news_context:
+        news_section = f"""
+【⚠️ 重要：以下是真實新聞資料，請務必參考】
+{news_context}
+
+【寫作要求】
+1. 請以這則新聞為文章的「核心靈感」或「切入點」
+2. 文章中必須引用新聞中的具體資訊（數據、案例、政策內容等）
+3. 可以在新聞基礎上進行延伸、補充背景知識或提出觀點
+4. 如果可能，在文章結尾註明參考來源
+"""
+    else:
+        news_section = """
+【寫作參考】
+目前無特定新聞參考資料，請基於你的知識和以下主題撰寫。
+"""
+
     prompt = f"""請寫一篇關於「{category}」的專業科普或生活文章。
+
+{news_section}
 
 今天的主題是：{subtopic}
 
@@ -72,6 +109,7 @@ def generate_article():
 - 禁止使用 Markdown 語法（不要用 **bold**、# 標題）
 - 禁止輸出 JSON 以外的任何文字
 - 禁止寫「總之」、「綜上所述」這類敷衍結尾
+{"- 如有參考新聞，請在文章中適當位置體現新聞資訊" if news_context else ""}
 """
 
     headers = {
@@ -79,21 +117,20 @@ def generate_article():
         "Content-Type": "application/json"
     }
 
-    # ✅ 調整參數：降低溫度提高專注度，提高 max_tokens 給更多空間
     payload = {
         "model": "deepseek-chat",
         "messages": [
             {"role": "system", "content": role_prompt},
             {"role": "user", "content": prompt}
         ],
-        "temperature": 0.5,      # 從 0.7 調低，讓 AI 更專注
-        "max_tokens": 2500,      # 從 2000 調高，留更多空間
+        "temperature": 0.5,
+        "max_tokens": 2500,
         "response_format": {"type": "json_object"}
     }
 
     print("🤖 正在呼叫 DeepSeek API 生成文章...")
     try:
-        response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=90)  # timeout 延長到 90 秒
+        response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=90)
         response.raise_for_status()
         data = response.json()
         
@@ -104,24 +141,20 @@ def generate_article():
         key_points = article_data.get("key_points", [])
         content = article_data.get("content", "")
         
-        # 清理可能殘留的 Markdown
         content = re.sub(r'\*\*(.+?)\*\*', r'\1', content)
         content = re.sub(r'\*(.+?)\*', r'\1', content)
         content = re.sub(r'^#{1,6}\s+', '', content, flags=re.MULTILINE)
         
-        # 確保有標題
         if not title:
             title = f"{category}｜{subtopic[:20]}"
         
-        # 確保 key_points 是列表且為 3 個
         if not isinstance(key_points, list):
             key_points = []
         while len(key_points) < 3:
             key_points.append("更多精彩內容請看內文")
         key_points = key_points[:3]
         
-        # ✅ 品質檢查：文章長度
-        content_text = re.sub(r'<[^>]+>', '', content)  # 移除 HTML 標籤
+        content_text = re.sub(r'<[^>]+>', '', content)
         word_count = len(content_text)
         
         print(f"✅ 文章生成成功：{title}")
@@ -145,7 +178,8 @@ def generate_article():
         
     except json.JSONDecodeError as e:
         print(f"❌ JSON 解析失敗：{e}")
-        print(f"原始回應前 500 字：{data['choices'][0]['message']['content'][:500]}...")
+        if 'data' in locals():
+            print(f"原始回應前 500 字：{data['choices'][0]['message']['content'][:500]}...")
         return None
     except requests.exceptions.Timeout:
         print("❌ API 呼叫超時（90秒），請稍後重試")
