@@ -3,7 +3,8 @@
 每日自動發文機器人
 - 四大類別輪換：植物、永續、碳盤查、生活
 - 支援手動觸發時透過環境變數覆蓋預設設定（AI角色、風格、結構、各類別主題）
-- 預設主題從內建庫中隨機選擇
+- 預設主題從內建庫中隨機選擇（當沒有新聞資料時）
+- **優先從爬蟲新聞 JSON 讀取真實新聞作為主題來源**
 - 文章保存為 HTML（套用官網模板）
 - 推送到網站倉庫的 daily-post 目錄
 - 自動生成索引頁面（外掛導覽列 + 分類篩選 + 即時搜尋）
@@ -17,8 +18,9 @@ import shutil
 import tempfile
 import re
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import requests
+from typing import List, Dict, Optional
 
 # 導入共用工具函數
 from utils import check_today_article_exists
@@ -35,7 +37,20 @@ CATEGORY_COLORS = {
     "生活": "#b88b4a"
 }
 
-# ==================== 子主題庫（預設） ====================
+# ==================== 爬蟲新聞資料路徑 ====================
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(SCRIPT_DIR)  # fbnote 根目錄
+NEWS_DATA_DIR = os.path.join(BASE_DIR, "news-data")
+
+# 類別名稱對應（Post-Daily 類別 → 爬蟲 JSON 檔案）
+CATEGORY_NEWS_FILE = {
+    "植物": "green_wall.json",
+    "永續": "esg.json",
+    "碳盤查": "carbon.json",
+    "生活": "life.json"
+}
+
+# ==================== 子主題庫（預設，當沒有新聞資料時使用） ====================
 SUB_TOPICS = {
     "植物": [
         "植生牆入門指南：打造你的第一面垂直花園",
@@ -134,6 +149,95 @@ DEFAULT_STRUCTURES = [
     "對比分析：A vs B，比較異同"
 ]
 
+# ==================== 新增：從爬蟲 JSON 讀取新聞 ====================
+def load_news_from_json(category: str) -> Optional[List[Dict]]:
+    """
+    從爬蟲產生的 JSON 檔案讀取指定類別的新聞
+    回傳格式：[{"title": "...", "source": "...", "date": "...", "summary": "...", "content": "..."}]
+    """
+    filename = CATEGORY_NEWS_FILE.get(category)
+    if not filename:
+        return None
+    
+    filepath = os.path.join(NEWS_DATA_DIR, filename)
+    if not os.path.exists(filepath):
+        print(f"📭 新聞檔案不存在: {filepath}")
+        return None
+    
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            news_list = json.load(f)
+        
+        if not news_list:
+            print(f"📭 {category} 分類暫無新聞資料")
+            return None
+        
+        print(f"📰 成功載入 {category} 分類新聞：共 {len(news_list)} 則")
+        return news_list
+        
+    except Exception as e:
+        print(f"⚠️ 讀取新聞 JSON 失敗 ({category}): {e}")
+        return None
+
+
+def get_news_based_topic(category: str) -> Optional[Dict]:
+    """
+    從新聞中隨機挑選一則作為主題
+    回傳格式：{"topic": "新聞標題", "news_context": "格式化後的文字", "source": "...", "date": "..."}
+    """
+    news_list = load_news_from_json(category)
+    if not news_list:
+        return None
+    
+    # 隨機選擇一則新聞
+    selected = random.choice(news_list)
+    
+    # 格式化新聞內容供 AI 參考
+    news_context = f"""
+【參考新聞】
+標題：{selected.get('title', '無標題')}
+來源：{selected.get('source', '未知來源')}
+日期：{selected.get('date', '日期不詳')}
+摘要：{selected.get('summary', '無摘要')}
+{'詳細內容：' + selected.get('content', '') if selected.get('content') else ''}
+"""
+    
+    return {
+        "topic": selected.get('title', ''),
+        "news_context": news_context,
+        "source": selected.get('source', ''),
+        "date": selected.get('date', ''),
+        "url": selected.get('url', '')
+    }
+
+
+def get_all_news_context(category: str, max_items: int = 3) -> Optional[str]:
+    """
+    獲取該分類的所有新聞（取最新 N 則），格式化成完整的參考資料
+    """
+    news_list = load_news_from_json(category)
+    if not news_list:
+        return None
+    
+    # 按日期排序（最新的在前）
+    sorted_news = sorted(news_list, key=lambda x: x.get('date', ''), reverse=True)
+    top_news = sorted_news[:max_items]
+    
+    context_parts = ["以下是與本主題相關的最新新聞資料，請參考這些真實新聞來撰寫文章：\n"]
+    
+    for i, news in enumerate(top_news, 1):
+        context_parts.append(f"""
+【新聞 {i}】
+標題：{news.get('title', '無標題')}
+來源：{news.get('source', '未知來源')}
+日期：{news.get('date', '日期不詳')}
+摘要：{news.get('summary', '無摘要')}
+{'原文摘要：' + news.get('content', '')[:300] + '...' if news.get('content') else ''}
+""")
+    
+    return "\n".join(context_parts)
+
+
 # ==================== 輔助函數 ====================
 def get_today_category():
     """根據手動觸發或日期決定類別"""
@@ -159,7 +263,7 @@ def get_custom_config():
         }
     }
 
-# ==================== 模板輔助函數 ====================
+# ==================== 模板輔助函數（保持不變） ====================
 def get_template_styles():
     """返回模板的 CSS 樣式"""
     return """/* ===== 共用樣式 ===== */
@@ -479,11 +583,11 @@ document.addEventListener('DOMContentLoaded', function () {
       if (nav) nav.classList.toggle('scrolled', window.scrollY > 20);
     });
     if (typeof lucide !== 'undefined') lucide.createIcons();
-  }
+  });
 });
 """
 
-# ==================== 文章生成 ====================
+# ==================== 文章生成（核心修改：加入新聞參考資料） ====================
 def generate_article():
     """调用 DeepSeek API 生成文章内容，回傳 dict（包含 title, content, category, summary, key_points）"""
     if not DEEPSEEK_API_KEY:
@@ -501,13 +605,28 @@ def generate_article():
         role_prompt = DEFAULT_ROLES.get(category, "你是一位科普作家。")
         print(f"🎭 預設角色（{category}）")
 
-    # 決定子主題
+    # ==================== 核心修改：優先從新聞讀取主題 ====================
+    news_context = None
+    subtopic = None
+    
+    # 檢查是否有手動指定主題（手動模式優先）
     if custom["topics"].get(category):
         subtopic = custom["topics"][category]
         print(f"🌱 手動主題：{subtopic}")
     else:
-        subtopic = random.choice(SUB_TOPICS.get(category, ["一般主題"]))
-        print(f"🌱 隨機主題：{subtopic}")
+        # 嘗試從爬蟲新聞讀取
+        news_data = get_news_based_topic(category)
+        
+        if news_data:
+            # 有新聞資料，使用新聞主題
+            subtopic = news_data["topic"]
+            news_context = news_data["news_context"]
+            print(f"📰 新聞主題：{subtopic}")
+            print(f"📰 新聞來源：{news_data.get('source', '未知')} ({news_data.get('date', '日期不詳')})")
+        else:
+            # 沒有新聞資料，回退到內建主題庫
+            subtopic = random.choice(SUB_TOPICS.get(category, ["一般主題"]))
+            print(f"🌱 隨機主題（內建）：{subtopic}")
 
     # 決定寫作風格
     if custom["style"]:
@@ -525,7 +644,30 @@ def generate_article():
         structure = random.choice(DEFAULT_STRUCTURES)
         print(f"📐 隨機結構：{structure}")
 
-    prompt = f"""請寫一篇關於「{category}」的科普或生活文章。
+    # ==================== 建構 Prompt（核心修改：加入新聞參考資料） ====================
+    
+    # 新聞參考區塊（如果有的話）
+    news_section = ""
+    if news_context:
+        news_section = f"""
+【⚠️ 重要：以下是真實新聞資料，請務必參考】
+{news_context}
+
+【寫作要求】
+1. 請以這則新聞為文章的「核心靈感」或「切入點」
+2. 文章中必須引用新聞中的具體資訊（數據、案例、政策內容等）
+3. 可以在新聞基礎上進行延伸、補充背景知識或提出觀點
+4. 如果可能，在文章結尾註明參考來源
+"""
+    else:
+        news_section = """
+【寫作參考】
+目前無特定新聞參考資料，請基於你的知識和以下主題撰寫。
+"""
+
+    prompt = f"""請寫一篇關於「{category}」的專業科普或生活文章。
+
+{news_section}
 
 今天的主題是：{subtopic}
 
@@ -545,6 +687,7 @@ def generate_article():
 3. 結尾加上「🌿 蕨積 - 讓生活多一點綠」
 4. 不要使用 Markdown 語法（不要用 **bold**、# 標題）
 5. 不要輸出 JSON 以外的任何文字
+{"6. 如有參考新聞，請在文章中適當位置體現新聞資訊" if news_context else ""}
 """
 
     headers = {
@@ -600,7 +743,7 @@ def generate_article():
         print(f"❌ API 呼叫失敗：{e}")
         return None
 
-# ==================== 儲存文章 ====================
+# ==================== 儲存文章（保持不變） ====================
 def save_article_as_html(title, content, category, summary, key_points, output_dir="articles"):
     """儲存文章為 HTML 檔案（優化版：確保標題格式、增加 meta 資訊）"""
     os.makedirs(output_dir, exist_ok=True)
@@ -763,7 +906,7 @@ def save_article_as_html(title, content, category, summary, key_points, output_d
     print(f"📄 文章已儲存：{filepath}")
     return filepath
 
-# ==================== 索引頁面生成 ====================
+# ==================== 索引頁面生成（保持不變） ====================
 def generate_daily_post_index(daily_post_dir):
     """產生 daily-post 目錄的索引頁面 + 分類頁面（乾淨標題列表 + 即時搜尋）"""
     
@@ -839,16 +982,6 @@ def generate_daily_post_index(daily_post_dir):
     # 右側熱門分類與連結
     # 計算本站統計
     total_articles = len(articles)
-    total_words = 0
-    category_counts = {cat: 0 for cat in CATEGORIES}
-    
-    for article in articles:
-        category_counts[article['category']] = category_counts.get(article['category'], 0) + 1
-        # 粗略估算字數（文章內容長度）
-        content_len = len(article.get('content', ''))
-        total_words += content_len
-    
-    # 平均每篇約 500-800 字，取中間值 650 字估算
     estimated_words = total_articles * 650
     
     # 右側分類瀏覽 + 本站統計
@@ -857,10 +990,10 @@ def generate_daily_post_index(daily_post_dir):
                         <div class="sidebar-card">
                             <h3>🌿 分類瀏覽</h3>
                             <ul class="sidebar-links">
-                                <li><a href="plant.html">🌱 植物文章 <span class="count-badge">{category_counts.get('植物', 0)}</span></a></li>
-                                <li><a href="sustainability.html">♻️ 永續文章 <span class="count-badge">{category_counts.get('永續', 0)}</span></a></li>
-                                <li><a href="carbon.html">📊 碳盤查文章 <span class="count-badge">{category_counts.get('碳盤查', 0)}</span></a></li>
-                                <li><a href="life.html">🏡 生活文章 <span class="count-badge">{category_counts.get('生活', 0)}</span></a></li>
+                                <li><a href="plant.html">🌱 植物文章 <span class="count-badge">{len([a for a in articles if a['category'] == '植物'])}</span></a></li>
+                                <li><a href="sustainability.html">♻️ 永續文章 <span class="count-badge">{len([a for a in articles if a['category'] == '永續'])}</span></a></li>
+                                <li><a href="carbon.html">📊 碳盤查文章 <span class="count-badge">{len([a for a in articles if a['category'] == '碳盤查'])}</span></a></li>
+                                <li><a href="life.html">🏡 生活文章 <span class="count-badge">{len([a for a in articles if a['category'] == '生活'])}</span></a></li>
                             </ul>
                         </div>
                         <div class="sidebar-card">
@@ -869,7 +1002,7 @@ def generate_daily_post_index(daily_post_dir):
                                 <li>📄 總文章數：<strong>{total_articles}</strong> 篇</li>
                                 <li>📝 累積字數：約 <strong>{estimated_words:,}</strong> 字</li>
                                 <li>📅 更新頻率：每日一篇</li>
-                                <li>🌱 主題分類：{len(CATEGORIES)} 大類</li>
+                                <li>🌱 主題分類：4 大類</li>
                             </ul>
                         </div>
                     </div>"""
@@ -1333,7 +1466,8 @@ def generate_daily_post_index(daily_post_dir):
         with open(cat_filepath, "w", encoding="utf-8") as f:
             f.write(cat_page_html)
         print(f"📁 已產生分類頁面：{category_files[current_cat]} (含搜尋功能)")
-# ==================== 推送 ====================
+
+# ==================== 推送（保持不變） ====================
 def commit_and_push_to_website():
     """推送到網站倉庫"""
     print("=" * 50)
