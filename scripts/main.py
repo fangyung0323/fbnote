@@ -759,12 +759,13 @@ import re
 # 内部链接映射表 (关键词 -> 目标URL，从 daily-post/ 出发的相对路径)
 LINK_MAP = {
     "植物": "../shop.html",
-    "植生牆": "../greenwall-intro.html",
-    "垂直綠化": "../greenwall-intro.html",
+    "購買": "../shop.html",
+    "植生牆": "../greenwall.html",
+    "垂直綠化": "../greenwall.html",
     "碳盤查": "../consult.html",
     "碳足跡": "../consult.html",
-    "ESG": "../consult.html",
-    "永續": "../consult.html",
+    "ESG": "../consulting.html",
+    "永續": "../consulting.html",
     "生活": "../lifestyle.html",
     "零浪費": "../lifestyle.html",
     "減塑": "../lifestyle.html",
