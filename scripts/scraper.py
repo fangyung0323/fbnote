@@ -177,7 +177,6 @@ def fetch_from_google_news() -> Dict[str, List[NewsItem]]:
 # ==================== 來源2：台灣媒體 RSS ====================
 RSS_FEEDS = [
     {"name": "中央社", "url": "https://www.cna.com.tw/rss/all.xml"},
-    {"name": "自由時報", "url": "https://news.ltn.com.tw/rss/all.xml"},
 ]
 
 def fetch_from_taiwan_rss() -> Dict[str, List[NewsItem]]:
