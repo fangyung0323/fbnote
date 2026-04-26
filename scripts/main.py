@@ -753,6 +753,57 @@ def generate_article():
         return None
 
 # ==================== 儲存文章（保持不變） ====================
+from bs4 import BeautifulSoup
+import re
+
+# 内部链接映射表 (关键词 -> 目标URL，从 daily-post/ 出发的相对路径)
+LINK_MAP = {
+    "植物": "../shop.html",
+    "植生牆": "../greenwall-intro.html",
+    "垂直綠化": "../greenwall-intro.html",
+    "碳盤查": "../consult.html",
+    "碳足跡": "../consult.html",
+    "ESG": "../consult.html",
+    "永續": "../consult.html",
+    "生活": "../lifestyle.html",
+    "零浪費": "../lifestyle.html",
+    "減塑": "../lifestyle.html",
+}
+
+def add_internal_links(html_content):
+    """在文章内容的文本节点中添加内部链接（相对路径）"""
+    if not html_content:
+        return html_content
+    
+    soup = BeautifulSoup(html_content, 'html.parser')
+    
+    # 按关键词长度降序排序（避免短词先替换影响长词）
+    keywords = sorted(LINK_MAP.keys(), key=len, reverse=True)
+    
+    for text_node in soup.find_all(string=True):
+        # 跳过 script、style 标签内以及已经是链接内部的文本
+        parent = text_node.parent
+        if parent.name in ['script', 'style', 'a']:
+            continue
+        
+        original_text = text_node.string
+        if not original_text:
+            continue
+        
+        new_text = original_text
+        for kw in keywords:
+            if kw in new_text:
+                url = LINK_MAP[kw]
+                # 使用正则匹配完整关键词（避免部分匹配如“植物学”）
+                pattern = re.compile(r'(' + re.escape(kw) + r')')
+                replacement = f'<a href="{url}">{kw}</a>'
+                new_text = pattern.sub(replacement, new_text)
+        
+        if new_text != original_text:
+            new_soup = BeautifulSoup(new_text, 'html.parser')
+            text_node.replace_with(new_soup)
+    
+    return str(soup)
 def save_article_as_html(title, content, category, summary, key_points, output_dir="articles"):
     """儲存文章為 HTML 檔案（優化版：確保標題格式、增加 meta 資訊）"""
     os.makedirs(output_dir, exist_ok=True)
@@ -763,7 +814,7 @@ def save_article_as_html(title, content, category, summary, key_points, output_d
     filepath = os.path.join(output_dir, filename)
     category_color = CATEGORY_COLORS.get(category, "#4a7c59")
     
-    content_html = content
+    content_html = add_internal_links(content)
     
     key_points_json = json.dumps(key_points, ensure_ascii=False)
     
