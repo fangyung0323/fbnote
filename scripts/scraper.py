@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
 台灣 ESG / 植生牆 / 碳盤查 / 生活 新聞爬蟲
-支援多種來源：Google News RSS、台灣媒體 RSS、環境資訊中心
+支援多種來源：Google News RSS、台灣媒體 RSS、環境資訊中心、上下游新聞
 產生 JSON 資料和靜態 HTML 網頁
+只保留 7 天內的新聞
 """
 
 import os
@@ -11,7 +12,7 @@ import re
 import time
 import random
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 import requests
 from bs4 import BeautifulSoup
 import feedparser
@@ -25,6 +26,9 @@ NEWS_PAGES_DIR = os.path.join(BASE_DIR, "news-pages")
 # 確保目錄存在
 os.makedirs(NEWS_DATA_DIR, exist_ok=True)
 os.makedirs(NEWS_PAGES_DIR, exist_ok=True)
+
+# 新聞時效性設定（只保留幾天內的新聞）
+MAX_DAYS_OLD = 7  # 只保留 7 天內的新聞
 
 # ==================== 新聞資料結構 ====================
 class NewsItem:
@@ -46,15 +50,61 @@ class NewsItem:
             "source": self.source,
             "url": self.url,
             "date": self.date,
-            "summary": self.summary[:200],  # 限制長度
+            "summary": self.summary[:200],
             "content": self.content[:500] if self.content else "",
             "category": self.category,
             "key_points": self.key_points
         }
 
-# ==================== 關鍵字分類對應 ====================
+# ==================== 日期處理函式 ====================
+def is_recent(date_str: str, max_days: int = MAX_DAYS_OLD) -> bool:
+    """檢查日期是否在指定天數內"""
+    if not date_str:
+        return False
+    try:
+        # 嘗試解析各種日期格式
+        if 'T' in date_str:
+            news_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        elif '-' in date_str and len(date_str) >= 10:
+            news_date = datetime.strptime(date_str[:10], "%Y-%m-%d")
+        elif '/' in date_str and len(date_str) >= 10:
+            news_date = datetime.strptime(date_str[:10], "%Y/%m/%d")
+        else:
+            # 無法解析，保守保留
+            return True
+        
+        now = datetime.now()
+        days_diff = (now - news_date).days
+        return 0 <= days_diff <= max_days
+    except:
+        return True  # 解析失敗時保留
+
+def parse_rss_date(date_str: str) -> Optional[str]:
+    """解析 RSS 的日期格式，回傳 YYYY-MM-DD"""
+    if not date_str:
+        return None
+    try:
+        from email.utils import parsedate_to_datetime
+        date_obj = parsedate_to_datetime(date_str)
+        return date_obj.strftime("%Y-%m-%d")
+    except:
+        # 嘗試其他格式
+        patterns = [
+            (r'(\d{4})-(\d{2})-(\d{2})', '%Y-%m-%d'),
+            (r'(\d{4})/(\d{2})/(\d{2})', '%Y/%m/%d'),
+        ]
+        for pattern, fmt in patterns:
+            match = re.search(pattern, date_str)
+            if match:
+                try:
+                    return datetime.strptime(match.group(0), fmt).strftime("%Y-%m-%d")
+                except:
+                    pass
+        return datetime.now().strftime("%Y-%m-%d")
+
+# ==================== 關鍵字分類對應（擴充植生牆相關）====================
 KEYWORD_TO_CATEGORY = {
-    # 植生牆 / 植物相關
+    # 植生牆 / 植物 / 園藝 / 景觀 / 森林 相關
     "植生牆": "植生牆",
     "垂直綠化": "植生牆",
     "綠牆": "植生牆",
@@ -62,6 +112,20 @@ KEYWORD_TO_CATEGORY = {
     "綠化": "植生牆",
     "盆栽": "植生牆",
     "花園": "植生牆",
+    "園藝": "植生牆",
+    "景觀": "植生牆",
+    "森林": "植生牆",
+    "造林": "植生牆",
+    "樹木": "植生牆",
+    "花草": "植生牆",
+    "綠地": "植生牆",
+    "屋頂綠化": "植生牆",
+    "生態園區": "植生牆",
+    "植栽": "植生牆",
+    "育苗": "植生牆",
+    "林業": "植生牆",
+    "公園": "植生牆",
+    "行道樹": "植生牆",
     
     # ESG 相關
     "ESG": "ESG",
@@ -69,6 +133,7 @@ KEYWORD_TO_CATEGORY = {
     "CSR": "ESG",
     "企業社會責任": "ESG",
     "永續發展": "ESG",
+    "SDGs": "ESG",
     
     # 碳盤查相關
     "碳盤查": "碳盤查",
@@ -78,6 +143,7 @@ KEYWORD_TO_CATEGORY = {
     "溫室氣體": "碳盤查",
     "碳權": "碳盤查",
     "氣候變遷": "碳盤查",
+    "減碳": "碳盤查",
     
     # 生活相關
     "生活": "生活",
@@ -85,29 +151,55 @@ KEYWORD_TO_CATEGORY = {
     "零浪費": "生活",
     "綠色生活": "生活",
     "減塑": "生活",
-    "循環經濟": "生活"
+    "循環經濟": "生活",
+    "永續飲食": "生活",
+    "環保餐具": "生活"
 }
 
 def classify_article(title: str, summary: str = "") -> str:
     """根據標題和內容判斷分類"""
     text_to_check = f"{title} {summary}".lower()
     
+    # 優先匹配更具體的分類
     for keyword, category in KEYWORD_TO_CATEGORY.items():
         if keyword.lower() in text_to_check:
             return category
     
     return "生活"  # 預設分類
 
-# ==================== 來源1：Google News RSS ====================
+# ==================== 來源1：Google News RSS（強化植生牆關鍵字 + 時間過濾）====================
 GOOGLE_NEWS_QUERIES = {
-    "植生牆": ["植生牆 台灣", "垂直綠化", "綠牆 建築"],
-    "ESG": ["ESG 台灣 企業", "永續發展 台灣", "企業社會責任"],
-    "碳盤查": ["碳盤查 台灣", "碳足跡 企業", "淨零排放 台灣"],
-    "生活": ["環保生活 台灣", "零廢棄 生活", "綠色消費"]
+    "植生牆": [
+        "植生牆 台灣 when:7d", 
+        "垂直綠化 when:7d", 
+        "綠牆 建築 when:7d",
+        "園藝 台灣 when:7d",
+        "景觀 設計 台灣 when:7d",
+        "森林 保育 台灣 when:7d",
+        "植物 新種 台灣 when:7d",
+        "都市綠化 台灣 when:7d",
+        "屋頂綠化 台灣 when:7d",
+        "行道樹 種植 台灣 when:7d"
+    ],
+    "ESG": [
+        "ESG 台灣 when:7d", 
+        "永續發展 台灣 when:7d",
+        "企業社會責任 台灣 when:7d"
+    ],
+    "碳盤查": [
+        "碳盤查 台灣 when:7d", 
+        "碳足跡 企業 when:7d", 
+        "淨零排放 台灣 when:7d"
+    ],
+    "生活": [
+        "環保生活 台灣 when:7d", 
+        "零廢棄 生活 when:7d", 
+        "綠色消費 台灣 when:7d"
+    ]
 }
 
 def fetch_from_google_news() -> Dict[str, List[NewsItem]]:
-    """從 Google News RSS 抓取新聞"""
+    """從 Google News RSS 抓取新聞（強化關鍵字 + 日期過濾）"""
     all_news = {
         "植生牆": [],
         "ESG": [],
@@ -119,7 +211,7 @@ def fetch_from_google_news() -> Dict[str, List[NewsItem]]:
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
     
-    print("\n🔍 開始從 Google News 抓取...")
+    print("\n🔍 開始從 Google News 抓取（限定 7 天內）...")
     
     for category, queries in GOOGLE_NEWS_QUERIES.items():
         for query in queries:
@@ -141,16 +233,15 @@ def fetch_from_google_news() -> Dict[str, List[NewsItem]]:
                         # 清理 HTML 標籤
                         summary = re.sub(r'<[^>]+>', '', summary)
                         
-                        # 轉換日期
-                        try:
-                            if published:
-                                from email.utils import parsedate_to_datetime
-                                date_obj = parsedate_to_datetime(published)
-                                date_str = date_obj.strftime("%Y-%m-%d")
-                            else:
-                                date_str = datetime.now().strftime("%Y-%m-%d")
-                        except:
+                        # 解析日期
+                        date_str = parse_rss_date(published)
+                        if not date_str:
                             date_str = datetime.now().strftime("%Y-%m-%d")
+                        
+                        # 🔥 過濾舊新聞
+                        if not is_recent(date_str):
+                            print(f"  ⏭️ [過濾] {title[:30]}... (日期: {date_str})")
+                            continue
                         
                         # 去重
                         existing_titles = [n.title for n in all_news[category]]
@@ -165,18 +256,20 @@ def fetch_from_google_news() -> Dict[str, List[NewsItem]]:
                                 category=category
                             )
                             all_news[category].append(news_item)
-                            print(f"  ✅ [Google/{category}] {title[:40]}...")
+                            print(f"  ✅ [Google/{category}] {title[:40]}... ({date_str})")
                     
             except Exception as e:
                 print(f"  ⚠️ Google News 查詢失敗 ({query}): {e}")
             
-            time.sleep(1)  # 避免請求過快
+            time.sleep(1)
     
     return all_news
 
 # ==================== 來源2：台灣媒體 RSS ====================
 RSS_FEEDS = [
     {"name": "中央社", "url": "https://www.cna.com.tw/rss/all.xml"},
+    {"name": "自由時報", "url": "https://news.ltn.com.tw/rss/all.xml"},
+    {"name": "環境資訊中心", "url": "https://e-info.org.tw/rss.xml"},
 ]
 
 def fetch_from_taiwan_rss() -> Dict[str, List[NewsItem]]:
@@ -200,7 +293,7 @@ def fetch_from_taiwan_rss() -> Dict[str, List[NewsItem]]:
             if feed.bozo:
                 print(f"  ⚠️ {source_name} RSS 解析可能有問題")
             
-            for entry in feed.entries[:20]:
+            for entry in feed.entries[:30]:
                 title = entry.get("title", "")
                 summary = entry.get("summary", "")[:200]
                 link = entry.get("link", "")
@@ -212,16 +305,14 @@ def fetch_from_taiwan_rss() -> Dict[str, List[NewsItem]]:
                 # 判斷分類
                 category = classify_article(title, summary)
                 
-                # 轉換日期
-                try:
-                    if published:
-                        from email.utils import parsedate_to_datetime
-                        date_obj = parsedate_to_datetime(published)
-                        date_str = date_obj.strftime("%Y-%m-%d")
-                    else:
-                        date_str = datetime.now().strftime("%Y-%m-%d")
-                except:
+                # 解析日期
+                date_str = parse_rss_date(published)
+                if not date_str:
                     date_str = datetime.now().strftime("%Y-%m-%d")
+                
+                # 過濾舊新聞
+                if not is_recent(date_str):
+                    continue
                 
                 # 去重
                 existing_titles = [n.title for n in all_news[category]]
@@ -236,7 +327,7 @@ def fetch_from_taiwan_rss() -> Dict[str, List[NewsItem]]:
                         category=category
                     )
                     all_news[category].append(news_item)
-                    print(f"  ✅ [{source_name}/{category}] {title[:40]}...")
+                    print(f"  ✅ [{source_name}/{category}] {title[:40]}... ({date_str})")
                     
         except Exception as e:
             print(f"  ❌ {source_name} RSS 失敗: {e}")
@@ -245,9 +336,9 @@ def fetch_from_taiwan_rss() -> Dict[str, List[NewsItem]]:
     
     return all_news
 
-# ==================== 來源3：環境資訊中心 ====================
-def fetch_from_einfo() -> Dict[str, List[NewsItem]]:
-    """從環境資訊中心抓取新聞（HTML 解析）"""
+# ==================== 來源3：上下游新聞（農業/植物相關）====================
+def fetch_from_newsandmarket() -> Dict[str, List[NewsItem]]:
+    """從上下游新聞抓取農業/植物相關新聞"""
     all_news = {
         "植生牆": [],
         "ESG": [],
@@ -257,16 +348,15 @@ def fetch_from_einfo() -> Dict[str, List[NewsItem]]:
     
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
     }
     
-    print("\n🌱 開始從環境資訊中心抓取...")
+    print("\n🌾 開始從上下游新聞抓取...")
     
-    # 環境資訊中心最新文章頁面
+    # 上下游新聞的首頁和分類頁面
     urls = [
-        "https://e-info.org.tw/",
-        "https://e-info.org.tw/taxonomy/term/1",  # 新聞分類
+        "https://www.newsmarket.com.tw/",
+        "https://www.newsmarket.com.tw/category/environment/",
+        "https://www.newsmarket.com.tw/category/agriculture/",
     ]
     
     for url in urls:
@@ -277,77 +367,170 @@ def fetch_from_einfo() -> Dict[str, List[NewsItem]]:
             if response.status_code == 200:
                 soup = BeautifulSoup(response.text, 'html.parser')
                 
-                # 尋找文章連結
-                # 常見模式：<a> 且 href 包含 /node/ 或 /taxonomy/
-                all_links = soup.find_all('a', href=True)
+                # 尋找文章區塊
+                articles = soup.find_all('article')
+                if not articles:
+                    articles = soup.find_all('div', class_=re.compile(r'post|entry|item'))
                 
-                for link in all_links:
-                    href = link.get('href', '')
-                    title = link.get_text(strip=True)
+                for article in articles[:15]:
+                    # 找標題連結
+                    title_link = article.find('a', href=True)
+                    if not title_link:
+                        continue
                     
-                    # 過濾條件
+                    title = title_link.get_text(strip=True)
+                    href = title_link['href']
+                    
                     if not title or len(title) < 10:
                         continue
                     
-                    # 檢查是否為文章連結
-                    is_article = ('/node/' in href or '/taxonomy/term/' in href or 
-                                  '/article/' in href)
+                    # 完整網址
+                    if href.startswith('/'):
+                        full_url = f"https://www.newsmarket.com.tw{href}"
+                    elif href.startswith('http'):
+                        full_url = href
+                    else:
+                        continue
                     
-                    if is_article:
-                        # 完整網址
-                        if href.startswith('/'):
-                            full_url = f"https://e-info.org.tw{href}"
-                        elif href.startswith('http'):
-                            full_url = href
-                        else:
-                            continue
-                        
-                        # 判斷分類
-                        category = classify_article(title)
-                        
-                        # 去重
-                        existing_titles = [n.title for n in all_news[category]]
-                        if title not in existing_titles:
-                            news_item = NewsItem(
-                                title=title,
-                                source="環境資訊中心",
-                                url=full_url,
-                                date=datetime.now().strftime("%Y-%m-%d"),
-                                summary=title[:150],
-                                content="",
-                                category=category
-                            )
-                            all_news[category].append(news_item)
-                            print(f"  ✅ [環境資訊中心/{category}] {title[:40]}...")
+                    # 找日期
+                    date_elem = article.find('time', class_=re.compile(r'date|entry-date'))
+                    date_str = datetime.now().strftime("%Y-%m-%d")
+                    if date_elem and date_elem.get('datetime'):
+                        date_str = parse_rss_date(date_elem['datetime'][:10])
+                    elif date_elem:
+                        date_text = date_elem.get_text(strip=True)
+                        date_str = parse_rss_date(date_text)
+                    
+                    if not date_str:
+                        date_str = datetime.now().strftime("%Y-%m-%d")
+                    
+                    # 過濾舊新聞
+                    if not is_recent(date_str):
+                        continue
+                    
+                    # 找摘要
+                    summary_elem = article.find('p', class_=re.compile(r'excerpt|summary|description'))
+                    summary = summary_elem.get_text(strip=True)[:150] if summary_elem else title[:150]
+                    
+                    # 分類
+                    category = classify_article(title, summary)
+                    
+                    # 去重
+                    existing_titles = [n.title for n in all_news[category]]
+                    if title not in existing_titles:
+                        news_item = NewsItem(
+                            title=title,
+                            source="上下游新聞",
+                            url=full_url,
+                            date=date_str,
+                            summary=summary,
+                            content="",
+                            category=category
+                        )
+                        all_news[category].append(news_item)
+                        print(f"  ✅ [上下游新聞/{category}] {title[:40]}... ({date_str})")
                 
-                # 每個分類限制數量
-                for cat in all_news:
-                    all_news[cat] = all_news[cat][:15]
-                    
             else:
-                print(f"  ⚠️ 環境資訊中心回應: {response.status_code}")
+                print(f"  ⚠️ 上下游新聞回應: {response.status_code}")
                 
         except Exception as e:
-            print(f"  ⚠️ 環境資訊中心抓取失敗: {e}")
+            print(f"  ⚠️ 上下游新聞抓取失敗: {e}")
         
         time.sleep(2)
     
     return all_news
 
-# ==================== 來源4：模擬資料（備用）====================
+# ==================== 來源4：我們的島（環境/植物相關）====================
+def fetch_from_our_island() -> Dict[str, List[NewsItem]]:
+    """從我們的島節目抓取環境相關新聞"""
+    all_news = {
+        "植生牆": [],
+        "ESG": [],
+        "碳盤查": [],
+        "生活": []
+    }
+    
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    }
+    
+    print("\n🏝️ 開始從我們的島抓取...")
+    
+    url = "https://ourisland.pts.org.tw/"
+    
+    try:
+        response = requests.get(url, headers=headers, timeout=30)
+        response.encoding = 'utf-8'
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # 尋找文章連結
+            for link in soup.find_all('a', href=True):
+                href = link['href']
+                title = link.get_text(strip=True)
+                
+                # 過濾條件
+                if not title or len(title) < 10:
+                    continue
+                
+                # 檢查是否為文章連結
+                if '/content/' in href or '/node/' in href or '/story/' in href:
+                    if href.startswith('/'):
+                        full_url = f"https://ourisland.pts.org.tw{href}"
+                    else:
+                        full_url = href
+                    
+                    # 找日期
+                    date_match = re.search(r'(\d{4})-(\d{2})-(\d{2})', title)
+                    if date_match:
+                        date_str = date_match.group(0)
+                    else:
+                        date_str = datetime.now().strftime("%Y-%m-%d")
+                    
+                    # 過濾舊新聞
+                    if not is_recent(date_str):
+                        continue
+                    
+                    category = classify_article(title)
+                    
+                    existing_titles = [n.title for n in all_news[category]]
+                    if title not in existing_titles:
+                        news_item = NewsItem(
+                            title=title,
+                            source="我們的島",
+                            url=full_url,
+                            date=date_str,
+                            summary=title[:150],
+                            content="",
+                            category=category
+                        )
+                        all_news[category].append(news_item)
+                        print(f"  ✅ [我們的島/{category}] {title[:40]}... ({date_str})")
+        
+        else:
+            print(f"  ⚠️ 我們的島回應: {response.status_code}")
+            
+    except Exception as e:
+        print(f"  ⚠️ 我們的島抓取失敗: {e}")
+    
+    return all_news
+
+# ==================== 來源5：模擬資料（備用，且日期新鮮）====================
 def fetch_mock_news() -> Dict[str, List[NewsItem]]:
-    """產生模擬新聞資料（當真實來源都失敗時使用）"""
+    """產生模擬新聞資料（日期保持新鮮）"""
     today = datetime.now().strftime("%Y-%m-%d")
     yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
     two_days_ago = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d")
+    three_days_ago = (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d")
     
     mock_news = {
         "植生牆": [
             NewsItem(
                 title="北市推建築物植生牆補助 每坪最高3000元",
                 source="自由時報",
-                url="#",
-                date=today,
+                url="https://news.ltn.com.tw/news/life/example1",
+                date=two_days_ago,
                 summary="台北市都發局宣布，為推動城市綠化，將補助既有建築物設置植生牆，每坪最高補助3000元。",
                 content="台北市都發局今日召開記者會，宣布推出「建築物植生牆設置補助計畫」。補助對象為台北市既有建築物，每案最高補助30萬元。",
                 category="植生牆"
@@ -355,19 +538,28 @@ def fetch_mock_news() -> Dict[str, List[NewsItem]]:
             NewsItem(
                 title="研究：辦公室的植生牆可提升15%工作效率",
                 source="環境資訊中心",
-                url="#",
+                url="https://e-info.org.tw/node/example2",
                 date=yesterday,
                 summary="最新研究顯示，辦公室設置植生牆不僅能淨化空氣，還能提升員工15%的工作效率。",
                 content="荷蘭烏特勒支大學研究發現，在辦公室設置植生牆後，員工工作效率平均提升15%，壓力指數降低22%。",
                 category="植生牆",
                 key_points=["提升15%工作效率", "降低22%壓力", "減少18%缺勤率"]
+            ),
+            NewsItem(
+                title="台中花博園區轉型永續公園 新增植生牆景觀",
+                source="聯合新聞網",
+                url="https://udn.com/news/example3",
+                date=three_days_ago,
+                summary="台中的花博園區將轉型為永續公園，新增多處植生牆景觀，成為都市新地標。",
+                content="台中市政府宣布，后里花博園區將改造為永續環境教育園區，新增植生牆、雨水回收系統等設施。",
+                category="植生牆"
             )
         ],
         "ESG": [
             NewsItem(
                 title="台灣企業ESG評比出爐 推動綠色轉型有成",
                 source="CSR天下",
-                url="#",
+                url="https://csr.cw.com.tw/example4",
                 date=today,
                 summary="2026年台灣企業ESG評比結果公布，多家企業在環境永續方面表現亮眼。",
                 content="天下雜誌公布2026年台灣企業ESG評比結果，企業在碳排放減量、綠色能源使用等方面均有顯著進步。",
@@ -378,7 +570,7 @@ def fetch_mock_news() -> Dict[str, List[NewsItem]]:
             NewsItem(
                 title="中小企業碳盤查補助方案 最高20萬元",
                 source="經濟日報",
-                url="#",
+                url="https://money.udn.com/example5",
                 date=yesterday,
                 summary="經濟部推出中小企業碳盤查補助方案，協助企業導入碳管理系統。",
                 content="經濟部宣布補助中小企業進行碳盤查，每家最高可申請20萬元。",
@@ -389,11 +581,20 @@ def fetch_mock_news() -> Dict[str, List[NewsItem]]:
             NewsItem(
                 title="零廢棄生活正夯 環保容器租借服務進駐台北",
                 source="倡議家",
-                url="#",
+                url="https://ubrand.udn.com/example6",
                 date=two_days_ago,
                 summary="主打循環經濟的環保容器租借服務進駐台北，民眾可租借可重複使用的容器。",
                 content="新創團隊推出環保容器租借服務，鼓勵民眾減少一次性垃圾。",
                 category="生活"
+            ),
+            NewsItem(
+                title="新北社區推都市農園 居民一起種菜享樂趣",
+                source="自由時報",
+                url="https://news.ltn.com.tw/example7",
+                date=three_days_ago,
+                summary="新北市某社區推出都市農園計畫，讓居民在頂樓種植蔬菜水果。",
+                content="社區管委會和里長合作，在社區頂樓打造都市農園，不僅綠化環境還能自給自足。",
+                category="植生牆"
             )
         ]
     }
@@ -411,6 +612,11 @@ def save_to_json(all_news: Dict[str, List[NewsItem]]):
     
     for category, news_list in all_news.items():
         if not news_list:
+            # 如果沒有新聞，保留原有檔案但標記為空
+            filepath = os.path.join(NEWS_DATA_DIR, file_map.get(category, f"{category}.json"))
+            if not os.path.exists(filepath):
+                with open(filepath, "w", encoding="utf-8") as f:
+                    json.dump([], f, ensure_ascii=False, indent=2)
             continue
         
         filename = file_map.get(category)
@@ -425,19 +631,21 @@ def save_to_json(all_news: Dict[str, List[NewsItem]]):
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
                     existing_news = json.load(f)
+                    # 只保留 7 天內的新聞
+                    existing_news = [item for item in existing_news if is_recent(item.get("date", ""))]
             except:
                 existing_news = []
         
         # 合併新資料
         existing_urls = {item.get("url") for item in existing_news}
-        new_items = [item.to_dict() for item in news_list if item.url not in existing_urls]
+        new_items = [item.to_dict() for item in news_list if item.url not in existing_urls and is_recent(item.date)]
         
         if new_items:
             all_items = new_items + existing_news
             # 按日期排序（最新的在前）
             all_items.sort(key=lambda x: x.get("date", ""), reverse=True)
-            # 只保留最近 30 筆
-            all_items = all_items[:30]
+            # 只保留最近 50 筆
+            all_items = all_items[:50]
             
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(all_items, f, ensure_ascii=False, indent=2)
@@ -553,11 +761,11 @@ def generate_homepage(all_news: Dict, category_names: List[str], category_files:
 <body>
     <div class="container">
         <h1>🌿 ESG · 植生牆 · 碳盤查 · 永續生活</h1>
-        <div class="update-info">📅 更新時間：{now}</div>
+        <div class="update-info">📅 更新時間：{now} | 只顯示 {MAX_DAYS_OLD} 天內的新聞</div>
         {preview_html}
         <div class="footer">
             <p>🤖 本頁由自動爬蟲產生，資料僅供 AI 文章生成參考</p>
-            <p>資料來源：Google News、中央社、自由時報、環境資訊中心</p>
+            <p>資料來源：Google News、中央社、自由時報、環境資訊中心、上下游新聞、我們的島</p>
         </div>
     </div>
 </body>
@@ -576,6 +784,7 @@ def generate_category_page(category: str, news_list: List[NewsItem], color: str)
 <h1>{category} 新聞摘要</h1>
 <p>📭 目前尚無相關新聞資料</p>
 <p>更新時間：{now}</p>
+<p>📌 只顯示 {MAX_DAYS_OLD} 天內的新聞</p>
 </body>
 </html>"""
     
@@ -634,7 +843,7 @@ def generate_category_page(category: str, news_list: List[NewsItem], color: str)
 <body>
     <div class="container">
         <h1>🌿 {category} 相關新聞摘要</h1>
-        <div class="update-info">📅 更新時間：{now} | 共 {len(news_list)} 則新聞</div>
+        <div class="update-info">📅 更新時間：{now} | 共 {len(news_list)} 則新聞（{MAX_DAYS_OLD} 天內）</div>
         {news_items_html}
         <div class="footer">
             <p>🤖 本頁資料由自動爬蟲產生，提供 AI 文章生成參考使用</p>
@@ -647,8 +856,9 @@ def generate_category_page(category: str, news_list: List[NewsItem], color: str)
 # ==================== 主程式 ====================
 def main():
     print("=" * 60)
-    print("🌿 台灣 ESG / 植生牆 / 碳盤查 新聞爬蟲 (多來源版本)")
+    print("🌿 台灣 ESG / 植生牆 / 碳盤查 新聞爬蟲 (多來源 + 時效過濾版)")
     print(f"執行時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"時效設定: 只保留 {MAX_DAYS_OLD} 天內的新聞")
     print("=" * 60)
     
     # 初始化結果
@@ -669,16 +879,24 @@ def main():
     for category in all_news:
         all_news[category].extend(taiwan_news.get(category, []))
     
-    # 3. 環境資訊中心
-    einfo_news = fetch_from_einfo()
+    # 3. 上下游新聞
+    newsandmarket_news = fetch_from_newsandmarket()
     for category in all_news:
-        all_news[category].extend(einfo_news.get(category, []))
+        all_news[category].extend(newsandmarket_news.get(category, []))
     
-    # 去重（根據標題）
+    # 4. 我們的島
+    ourisland_news = fetch_from_our_island()
+    for category in all_news:
+        all_news[category].extend(ourisland_news.get(category, []))
+    
+    # 去重（根據標題）並過濾日期
     for category in all_news:
         seen_titles = set()
         unique_news = []
         for news in all_news[category]:
+            # 再次確保日期在範圍內
+            if not is_recent(news.date):
+                continue
             if news.title not in seen_titles:
                 seen_titles.add(news.title)
                 unique_news.append(news)
@@ -690,6 +908,9 @@ def main():
     if total_count == 0:
         print("\n⚠️ 所有來源皆未抓到新聞，改用模擬資料...")
         all_news = fetch_mock_news()
+        # 模擬資料也要過濾日期
+        for category in all_news:
+            all_news[category] = [n for n in all_news[category] if is_recent(n.date)]
     
     # 儲存 JSON 和產生 HTML
     print("\n💾 儲存 JSON 資料...")
@@ -702,6 +923,7 @@ def main():
     print("✅ 爬蟲執行完畢！")
     print(f"📁 JSON 資料位置: {NEWS_DATA_DIR}")
     print(f"📁 HTML 頁面位置: {NEWS_PAGES_DIR}")
+    print(f"📌 注意：只保留 {MAX_DAYS_OLD} 天內的新聞")
     print("=" * 60)
 
 
