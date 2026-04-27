@@ -1076,9 +1076,23 @@ def generate_daily_post_index(daily_post_dir):
     total_articles = len(articles)
     estimated_words = total_articles * 650
     
-    # 右側分類瀏覽 + 本站統計
+    # Google Apps Script 訂閱網址（請替換成你的）
+    APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwH5X_4_arrGY5_BAbeO1-IdNYgFL4dnDWNnPzcVtsr7sJiGk5kNhDNQf9ssTGUcPx22A/exec'
+    
+    # 右側邊欄 HTML（加入訂閱表單在分類瀏覽上方）
     sidebar_html = f"""
                     <div class="sidebar-col">
+                        <!-- 📧 訂閱卡片 -->
+                        <div class="sidebar-card subscribe-card" style="background: #e8f0e4;">
+                            <h3>📧 免費訂閱</h3>
+                            <p style="font-size: 0.8rem; color: var(--stone); margin-bottom: 0.8rem;">每日文章直送信箱</p>
+                            <form id="sidebar-subscribe-form">
+                                <input type="email" id="sidebar-email" placeholder="your@email.com" required style="width:100%; padding:0.6rem; border:1px solid #d0c8bc; border-radius:30px; margin-bottom:0.8rem; font-size:0.85rem; text-align:center;">
+                                <button type="submit" style="width:100%; background:var(--fern); color:white; border:none; padding:0.6rem; border-radius:30px; cursor:pointer; font-size:0.85rem; font-weight:500;">🌿 訂閱</button>
+                            </form>
+                            <div id="sidebar-subscribe-message" style="margin-top:0.8rem; font-size:0.7rem; text-align:center; display:none;"></div>
+                        </div>
+                        
                         <div class="sidebar-card">
                             <h3>🌿 分類瀏覽</h3>
                             <ul class="sidebar-links">
@@ -1088,6 +1102,7 @@ def generate_daily_post_index(daily_post_dir):
                                 <li><a href="life.html">🏡 生活文章 <span class="count-badge">{len([a for a in articles if a['category'] == '生活'])}</span></a></li>
                             </ul>
                         </div>
+                        
                         <div class="sidebar-card">
                             <h3>📊 本站統計</h3>
                             <ul class="sidebar-stats">
@@ -1275,6 +1290,52 @@ def generate_daily_post_index(daily_post_dir):
     
     <script>
         {get_nav_script()}
+        
+        // 側邊欄訂閱功能
+        (function() {{
+            const APPS_SCRIPT_URL = '{APPS_SCRIPT_URL}';
+            const sidebarForm = document.getElementById('sidebar-subscribe-form');
+            
+            if (sidebarForm) {{
+                sidebarForm.addEventListener('submit', async (e) => {{
+                    e.preventDefault();
+                    const email = document.getElementById('sidebar-email').value;
+                    const messageDiv = document.getElementById('sidebar-subscribe-message');
+                    
+                    if (!email) return;
+                    
+                    messageDiv.style.display = 'block';
+                    messageDiv.style.color = '#5a7a4a';
+                    messageDiv.innerHTML = '📡 送出中...';
+                    
+                    try {{
+                        await fetch(APPS_SCRIPT_URL, {{
+                            method: 'POST',
+                            mode: 'no-cors',
+                            headers: {{ 'Content-Type': 'application/json' }},
+                            body: JSON.stringify({{
+                                action: 'subscribe',
+                                name: '讀者',
+                                email: email,
+                                preference: 'all'
+                            }})
+                        }});
+                        
+                        messageDiv.style.color = '#2c5e2e';
+                        messageDiv.innerHTML = '✅ 訂閱成功！';
+                        document.getElementById('sidebar-email').value = '';
+                        
+                        setTimeout(() => {{
+                            messageDiv.style.display = 'none';
+                        }}, 3000);
+                        
+                    }} catch (error) {{
+                        messageDiv.style.color = '#721c24';
+                        messageDiv.innerHTML = '❌ 送出失敗，請稍後再試。';
+                    }}
+                }});
+            }}
+        }})();
     </script>
 </body>
 </html>"""
