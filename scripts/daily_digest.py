@@ -139,7 +139,7 @@ def send_email(to_email, to_name, title, summary, key_points_html, article_url):
             <p><strong>📌 摘要：</strong> {summary}</p>
             <p><strong>✨ 重點整理：</strong></p>
             {key_points_html}
-             <p><strong>👉</strong> <a href="https://www.fernbrom.com/daily-post/{article_filename}" style="color: #5a7a4a;">今日完整文章</a></p>
+             <p><strong>👉</strong> <a href="article_url" style="color: #5a7a4a;">今日完整文章</a></p>
             <p><strong>👉</strong> <a href="https://www.fernbrom.com/daily-post/" style="color: #5a7a4a;">閱讀更多</a></p>
         </div>
         <hr style="border-color: #d4e4c8;">
