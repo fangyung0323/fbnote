@@ -711,7 +711,7 @@ def generate_article():
 - content: 文章內文（使用 HTML 格式，包含 <h2>、<p> 標籤）
 
 要求：
-1. 文章長度約 500-800 字
+1. 文章長度約 800-1000 字
 2. 語言使用繁體中文
 3. 結尾加上「🌿 蕨積 - 讓生活多一點綠」
 4. 不要使用 Markdown 語法（不要用 **bold**、# 標題）
@@ -730,7 +730,7 @@ def generate_article():
             {"role": "system", "content": role_prompt},
             {"role": "user", "content": prompt}
         ],
-        "temperature": 0.7,
+        "temperature": 0.8,
         "max_tokens": 2000,
         "response_format": {"type": "json_object"}
     }
