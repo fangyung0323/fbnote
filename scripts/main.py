@@ -1077,7 +1077,7 @@ def generate_daily_post_index(daily_post_dir):
     estimated_words = total_articles * 650
     
     # Google Apps Script 訂閱網址（請替換成你的）
-    APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwH5X_4_arrGY5_BAbeO1-IdNYgFL4dnDWNnPzcVtsr7sJiGk5kNhDNQf9ssTGUcPx22A/exec'
+    APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyb5SP8GCGdMDMniLfGcqHuvzrGw9XNp3JSS6l2dWLvb55ELVmJe0OlpmzVShJ3j7Pw/exec/exec'
     
     # 右側邊欄 HTML（加入訂閱表單在分類瀏覽上方）
     sidebar_html = f"""
