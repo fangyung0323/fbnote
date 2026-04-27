@@ -131,7 +131,7 @@ def send_email(to_email, to_name, title, summary, key_points_html, article_url):
     <html>
     <head><meta charset="UTF-8"></head>
     <body style="font-family: 'Noto Sans TC', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #2c3e2f;">
-        <h2 style="color: #3d5a38;">🌿 {to_name} 您好，</h2>
+        <h2 style="color: #3d5a38;">🌿親愛的{to_name}您好，</h2>
         <p>蕨積|每日摘要：</p>
         <hr style="border-color: #d4e4c8;">
         <div style="background: #faf8f4; padding: 16px; border-radius: 12px;">
@@ -139,12 +139,13 @@ def send_email(to_email, to_name, title, summary, key_points_html, article_url):
             <p><strong>📌 摘要：</strong> {summary}</p>
             <p><strong>✨ 重點整理：</strong></p>
             {key_points_html}
+             <p><strong>👉</strong> <a href="https://www.fernbrom.com/daily-post/{article_filename}" style="color: #5a7a4a;">今日完整文章</a></p>
             <p><strong>👉</strong> <a href="https://www.fernbrom.com/daily-post/" style="color: #5a7a4a;">閱讀更多</a></p>
         </div>
         <hr style="border-color: #d4e4c8;">
         <p style="color: #9a9080; font-size: 12px; margin-top: 30px;">
             每天一篇，與你一起成長 🌿<br>
-            <a href="https://www.fernbrom.com/subscribe.html" style="color: #9a9080;">取消訂閱</a>
+            <a href="https://www.fernbrom.com/sub.html" style="color: #9a9080;">取消訂閱</a>
         </p>
     </body>
     </html>
