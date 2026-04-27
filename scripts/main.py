@@ -1292,15 +1292,16 @@ def generate_daily_post_index(daily_post_dir):
         {get_nav_script()}
         
         // 側邊欄訂閱功能（改用 URL 參數，可寫入 Sheet）
-(function() {
+// 側邊欄訂閱功能（簡化版）
+(function() {{
     const APPS_SCRIPT_URL = '{APPS_SCRIPT_URL}';
     const sidebarForm = document.getElementById('sidebar-subscribe-form');
     
-    if (sidebarForm) {
-        sidebarForm.addEventListener('submit', async (e) => {
+    if (sidebarForm) {{
+        sidebarForm.onsubmit = function(e) {{
             e.preventDefault();
-            const email = document.getElementById('sidebar-email').value;
-            const messageDiv = document.getElementById('sidebar-subscribe-message');
+            var email = document.getElementById('sidebar-email').value;
+            var messageDiv = document.getElementById('sidebar-subscribe-message');
             
             if (!email) return;
             
@@ -1308,33 +1309,22 @@ def generate_daily_post_index(daily_post_dir):
             messageDiv.style.color = '#5a7a4a';
             messageDiv.innerHTML = '📡 送出中...';
             
-            try {
-                // 改成使用 URL 參數（GET 方式）
-                const url = new URL(APPS_SCRIPT_URL);
-                url.searchParams.append('action', 'subscribe');
-                url.searchParams.append('name', '讀者');
-                url.searchParams.append('email', email);
-                
-                await fetch(url.toString(), {
-                    method: 'POST',
-                    mode: 'no-cors'
-                });
-                
-                messageDiv.style.color = '#2c5e2e';
-                messageDiv.innerHTML = '✅ 訂閱成功！';
-                document.getElementById('sidebar-email').value = '';
-                
-                setTimeout(() => {
-                    messageDiv.style.display = 'none';
-                }, 3000);
-                
-            } catch (error) {
-                messageDiv.style.color = '#721c24';
-                messageDiv.innerHTML = '❌ 送出失敗，請稍後再試。';
-            }
-        });
-    }
-})();
+            var url = APPS_SCRIPT_URL + '?action=subscribe&name=讀者&email=' + encodeURIComponent(email);
+            
+            fetch(url, {{ method: 'POST', mode: 'no-cors' }})
+                .then(function() {{
+                    messageDiv.style.color = '#2c5e2e';
+                    messageDiv.innerHTML = '✅ 訂閱成功！';
+                    document.getElementById('sidebar-email').value = '';
+                    setTimeout(function() {{ messageDiv.style.display = 'none'; }}, 3000);
+                }})
+                .catch(function() {{
+                    messageDiv.style.color = '#721c24';
+                    messageDiv.innerHTML = '❌ 送出失敗，請稍後再試。';
+                }});
+        }};
+    }}
+}})();
     </script>
 </body>
 </html>"""
