@@ -5,6 +5,7 @@
 - 支援手動觸發時透過環境變數覆蓋預設設定（AI角色、風格、結構、各類別主題）
 - 預設主題從內建庫中隨機選擇（當沒有新聞資料時）
 - **優先從爬蟲新聞 JSON 讀取真實新聞作為主題來源**
+- **要求 AI 生成 70% 以上原創觀點，新聞僅作為切入點**
 - 文章保存為 HTML（套用官網模板）
 - 推送到網站倉庫的 daily-post 目錄
 - 自動生成索引頁面（外掛導覽列 + 分類篩選 + 即時搜尋）
@@ -61,7 +62,6 @@ SUB_TOPICS = {
         "植物療癒力：為什麼看著植物會感到放鬆",
         "台灣原生植物之美：認識身邊的綠色鄰居",
         "植物與兒童教育：讓孩子從自然中學習",
-        "植生牆入門指南：打造你的第一面垂直花園",
         "植生牆的結構設計：骨架、防水、排水一次搞懂",
         "植生牆植物怎麼選？耐陰、好養、漂亮的推薦清單",
         "植生牆養護全攻略：澆水、修剪、施肥、病蟲害",
@@ -81,7 +81,13 @@ SUB_TOPICS = {
         "植生牆 vs 傳統盆栽：優缺點比較",
         "植生牆如何幫助建築降溫？實測數據分享",
         "打造會呼吸的家：植生牆讓室內空氣更清新",
-        "辦公室植物推薦：提升工作效率的綠色夥伴"
+        "辦公室植物推薦：提升工作效率的綠色夥伴",
+        "居家植生牆設計：客廳、陽台、臥室怎麼擺",
+        "植物殺手救星：最難養死的10種室內植物",
+        "水耕植物入門：不用土也能種出綠意",
+        "多肉植物照顧大全：澆水、日照、換盆一次懂",
+        "植物與風水：室內綠化如何帶來好運",
+        "租屋族必看：不傷牆面的植生牆解決方案"
     ],
     "永續": [
         "零浪費生活入門：從今天開始減少垃圾",
@@ -93,7 +99,12 @@ SUB_TOPICS = {
         "永續飲食：從餐桌開始改變世界",
         "企業永續案例：那些做對事的大公司",
         "環保旅遊怎麼玩：低碳出遊指南",
-        "永續投資入門：用錢投票給更好的未來"
+        "永續投資入門：用錢投票給更好的未來",
+        "SDGs是什麼？聯合國永續發展目標懶人包",
+        "B型企業認證：對社會有貢獻的公司",
+        "永續時尚：買衣服也能愛地球",
+        "共享經濟：創造更多價值的消費模式",
+        "都市永續轉型：綠色交通與智慧城市"
     ],
     "碳盤查": [
         "什麼是碳足跡？從一杯咖啡開始算起",
@@ -105,7 +116,12 @@ SUB_TOPICS = {
         "生活中的減碳行動：省電、省水、省碳",
         "碳盤查常見問題：一次搞懂所有疑問",
         "國際碳關稅對台灣的影響與因應",
-        "中小企業碳管理入門：從哪裡開始"
+        "中小企業碳管理入門：從哪裡開始",
+        "ISO 14064 碳盤查標準白話文解釋",
+        "範疇一、二、三：企業碳排的三種分類",
+        "碳抵換專案：花錢就能解決碳排放嗎",
+        "科學基礎減碳目標 SBTi 是什麼",
+        "RE100：企業使用100%再生能源的承諾"
     ],
     "生活": [
         "斷捨離實踐指南：告別雜物，迎接清爽",
@@ -117,7 +133,12 @@ SUB_TOPICS = {
         "數字排毒：如何減少手機使用時間",
         "手作療癒時光：用雙手創造快樂",
         "與自己獨處的藝術：享受一個人的時光",
-        "創造幸福小習慣：每天一點點正向改變"
+        "創造幸福小習慣：每天一點點正向改變",
+        "晨間習慣養成：如何擁有一個美好的早晨",
+        "極簡主義入門：留下真正重要的東西",
+        "居家改造 DIY：小預算打造舒適空間",
+        "有效時間管理：擺脫拖延症的方法",
+        "情緒覺察練習：更好理解自己"
     ]
 }
 
@@ -137,7 +158,9 @@ DEFAULT_STYLES = [
     "問答形式，自問自答",
     "清單體，條列呈現",
     "對比分析，比較觀點",
-    "日記體，個人經驗"
+    "日記體，個人經驗",
+    "第一人稱觀點，分享個人想法",
+    "案例分析，從具體例子出發"
 ]
 
 # ==================== 預設結構（隨機） ====================
@@ -146,10 +169,11 @@ DEFAULT_STRUCTURES = [
     "故事引入：用小故事或案例開場",
     "問題解決：提出問題 → 分析 → 解答",
     "條列清單：用數字或項目符號整理",
-    "對比分析：A vs B，比較異同"
+    "對比分析：A vs B，比較異同",
+    "觀點論述：提出觀點 → 論證 → 結論"
 ]
 
-# ==================== 新增：從爬蟲 JSON 讀取新聞 ====================
+# ==================== 從爬蟲 JSON 讀取新聞 ====================
 def load_news_from_json(category: str) -> Optional[List[Dict]]:
     """
     從爬蟲產生的 JSON 檔案讀取指定類別的新聞
@@ -192,14 +216,14 @@ def get_news_based_topic(category: str) -> Optional[Dict]:
     # 隨機選擇一則新聞
     selected = random.choice(news_list)
     
-    # 格式化新聞內容供 AI 參考
+    # 格式化新聞內容供 AI 參考（精簡版，避免 AI 直接複製）
     news_context = f"""
-【參考新聞】
+【新聞摘要】
 標題：{selected.get('title', '無標題')}
 來源：{selected.get('source', '未知來源')}
 日期：{selected.get('date', '日期不詳')}
-摘要：{selected.get('summary', '無摘要')}
-{'詳細內容：' + selected.get('content', '') if selected.get('content') else ''}
+核心內容：{selected.get('summary', '無摘要')[:200]}
+{'重點節錄：' + selected.get('content', '')[:300] + '...' if selected.get('content') else ''}
 """
     
     return {
@@ -263,7 +287,7 @@ def get_custom_config():
         }
     }
 
-# ==================== 模板輔助函數（保持不變） ====================
+# ==================== 模板輔助函數 ====================
 def get_template_styles():
     """返回模板的 CSS 樣式"""
     return """/* ===== 共用樣式 ===== */
@@ -593,12 +617,15 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     if (typeof lucide !== 'undefined') lucide.createIcons();
-  }
-});
+  });
+}
 """
-# ==================== 文章生成（核心修改：加入新聞參考資料） ====================
+
+# ==================== 文章生成（核心：70% 原創觀點） ====================
 def generate_article():
-    """调用 DeepSeek API 生成文章内容，回傳 dict（包含 title, content, category, summary, key_points）"""
+    """调用 DeepSeek API 生成文章内容，回傳 dict
+    要求：70% 以上原創觀點，新聞僅作為切入點和案例參考
+    """
     if not DEEPSEEK_API_KEY:
         print("❌ 錯誤：DEEPSEEK_API_KEY 環境變數未設定")
         return None
@@ -614,9 +641,10 @@ def generate_article():
         role_prompt = DEFAULT_ROLES.get(category, "你是一位科普作家。")
         print(f"🎭 預設角色（{category}）")
 
-    # ==================== 核心修改：優先從新聞讀取主題 ====================
-    news_context = None
+    # ==================== 從新聞讀取主題 ====================
+    news_data = None
     subtopic = None
+    news_context = None
     
     # 檢查是否有手動指定主題（手動模式優先）
     if custom["topics"].get(category):
@@ -627,10 +655,10 @@ def generate_article():
         news_data = get_news_based_topic(category)
         
         if news_data:
-            # 有新聞資料，使用新聞主題
+            # 有新聞資料，使用新聞標題作為切入點
             subtopic = news_data["topic"]
             news_context = news_data["news_context"]
-            print(f"📰 新聞主題：{subtopic}")
+            print(f"📰 新聞切入點：{subtopic}")
             print(f"📰 新聞來源：{news_data.get('source', '未知')} ({news_data.get('date', '日期不詳')})")
         else:
             # 沒有新聞資料，回退到內建主題庫
@@ -653,50 +681,81 @@ def generate_article():
         structure = random.choice(DEFAULT_STRUCTURES)
         print(f"📐 隨機結構：{structure}")
 
-    # ==================== 建構 Prompt（核心修改：加入新聞參考資料） ====================
+    # ==================== 建構 Prompt（70% 原創觀點版本） ====================
     
-    # 新聞參考區塊（如果有的話）
-    news_section = ""
     if news_context:
+        # 有新聞資料時：新聞僅作為 30% 的參考，要求 70% 原創
         news_section = f"""
-【⚠️ 重要：以下是真實新聞資料，請務必參考】
+【📰 參考新聞（僅作為切入點和案例，請勿照抄）】
 {news_context}
 
-【寫作要求】
-1. 請以這則新聞為文章的「核心靈感」或「切入點」
-2. 文章中必須引用新聞中的具體資訊（數據、案例、政策內容等）
-3. 可以在新聞基礎上進行延伸、補充背景知識或提出觀點
-4. 如果可能，在文章結尾註明參考來源
+【⚠️ 核心要求：原創觀點優先】
+這則新聞只是一個「起點」或「案例參考」，請你不要只是複述新聞內容。
+
+請依照以下比例撰寫文章：
+- 🟢 30%：引用新聞中的具體資訊（數據、案例、政策內容）作為佐證
+- 🟡 70%：你的原創觀點、深度分析、延伸思考、實務建議
+
+具體做法：
+1. **開頭（15%）**：用新聞事件作為引言，但提出你的觀察角度
+2. **分析（40%）**：從新聞延伸出去的專業分析，包含：
+   - 這個現象背後的原因是什麼？
+   - 對讀者（個人/企業）有什麼影響？
+   - 你預測未來的發展趨勢？
+3. **觀點（30%）**：你的獨特見解和立場
+   - 支持或反對？為什麼？
+   - 有什麼更好的做法？
+4. **行動建議（15%）**：給讀者的具體建議
+
+✅ 好的例子：
+   - 「從這則新聞可以看出，台灣的植生牆政策正在轉向⋯⋯我認為接下來應該注意三個方向⋯⋯」
+   - 「新聞中提到每坪補助3000元，但真正的問題在於後續維護成本。根據我的觀察⋯⋯」
+
+❌ 壞的例子（太像新聞稿）：
+   - 「台北市都發局宣布，將補助建築物設置植生牆⋯⋯」
+   - 「根據報導，這項政策將於明年實施⋯⋯」
 """
     else:
-        news_section = """
-【寫作參考】
-目前無特定新聞參考資料，請基於你的知識和以下主題撰寫。
+        # 沒有新聞資料時：完全依賴 AI 知識，100% 原創
+        news_section = f"""
+【寫作說明】
+目前無特定新聞參考資料，請完全基於你的專業知識撰寫。
+
+【要求】
+- 請寫出具有原創觀點和深度的內容
+- 不要使用「根據新聞報導」、「近期研究顯示」這類空泛引用
+- 用自己的話解釋概念，提出獨特見解
 """
 
     prompt = f"""請寫一篇關於「{category}」的專業科普或生活文章。
 
 {news_section}
 
-今天的主題是：{subtopic}
+今天的主題 / 切入點是：{subtopic}
 
 寫作風格：{style}
 
 文章結構：{structure}
 
 【重要】請以 JSON 格式輸出，包含以下欄位：
-- title: 文章標題（15字以內，吸引人）
+- title: 文章標題（15字以內，吸引人，最好能體現你的觀點）
 - summary: 一句話總結（30字以內，讓人想點進來）
 - key_points: 三個重點，格式為 ["重點一", "重點二", "重點三"]
 - content: 文章內文（使用 HTML 格式，包含 <h2>、<p> 標籤）
 
-要求：
-1. 文章長度約 500-800 字
-2. 語言使用繁體中文
-3. 結尾加上「🌿 蕨積 - 讓生活多一點綠」
-4. 不要使用 Markdown 語法（不要用 **bold**、# 標題）
-5. 不要輸出 JSON 以外的任何文字
-{"6. 如有參考新聞，請在文章中適當位置體現新聞資訊" if news_context else ""}
+【文章長度】500-800 字
+【語言】繁體中文
+【結尾】加上「🌿 蕨積 - 讓生活多一點綠」
+
+【禁止事項】
+1. 不要使用 Markdown 語法（不要用 **bold**、# 標題）
+2. 不要寫「根據新聞報導」、「據了解」、「相關單位表示」這類新聞稿語言
+3. 不要只是改寫新聞內容
+4. 不要輸出 JSON 以外的任何文字
+
+【原創性檢查】
+寫完後請自我檢查：這篇文章是否有 70% 以上的內容是你的觀點和分析？
+如果沒有，請重新思考角度再寫。
 """
 
     headers = {
@@ -710,14 +769,14 @@ def generate_article():
             {"role": "system", "content": role_prompt},
             {"role": "user", "content": prompt}
         ],
-        "temperature": 0.7,
-        "max_tokens": 2000,
+        "temperature": 0.8,  # 稍微提高溫度，增加原創性
+        "max_tokens": 2500,
         "response_format": {"type": "json_object"}
     }
 
-    print("🤖 正在呼叫 DeepSeek API 生成文章...")
+    print("🤖 正在呼叫 DeepSeek API 生成文章（要求 70% 原創觀點）...")
     try:
-        response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=60)
+        response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=90)
         response.raise_for_status()
         data = response.json()
         
@@ -728,6 +787,7 @@ def generate_article():
         key_points = article_data.get("key_points", [])
         content = article_data.get("content", "")
         
+        # 清理 Markdown
         content = re.sub(r'\*\*(.+?)\*\*', r'\1', content)
         content = re.sub(r'\*(.+?)\*', r'\1', content)
         content = re.sub(r'^#{1,6}\s+', '', content, flags=re.MULTILINE)
@@ -740,21 +800,23 @@ def generate_article():
 
         print(f"✅ 文章生成成功：{title}")
         print(f"📂 類別：{category}")
+        if news_data:
+            print(f"📰 參考新聞：{news_data.get('source', '未知')}")
         
         return {
             "title": title,
             "content": content,
             "category": category,
             "summary": summary,
-            "key_points": key_points
+            "key_points": key_points,
+            "news_used": news_data is not None
         }
     except Exception as e:
         print(f"❌ API 呼叫失敗：{e}")
         return None
 
-# ==================== 儲存文章（保持不變） ====================
+# ==================== 儲存文章 ====================
 from bs4 import BeautifulSoup
-import re
 
 # 内部链接映射表 (关键词 -> 目标URL，从 daily-post/ 出发的相对路径)
 LINK_MAP = {
@@ -805,6 +867,7 @@ def add_internal_links(html_content):
             text_node.replace_with(new_soup)
     
     return str(soup)
+
 def save_article_as_html(title, content, category, summary, key_points, output_dir="articles"):
     """儲存文章為 HTML 檔案（優化版：確保標題格式、增加 meta 資訊）"""
     os.makedirs(output_dir, exist_ok=True)
@@ -967,7 +1030,7 @@ def save_article_as_html(title, content, category, summary, key_points, output_d
     print(f"📄 文章已儲存：{filepath}")
     return filepath
 
-# ==================== 索引頁面生成（保持不變） ====================
+# ==================== 索引頁面生成 ====================
 def generate_daily_post_index(daily_post_dir):
     """產生 daily-post 目錄的索引頁面 + 分類頁面（乾淨標題列表 + 即時搜尋）"""
     
@@ -1033,7 +1096,7 @@ def generate_daily_post_index(daily_post_dir):
         print("📑 已更新 daily-post/index.html (無文章)")
         return
     
-    # ========== 第三步：產生主索引頁面（最新文章全文 + 近期文章 + 右側邊欄）==========
+    # ========== 第三步：產生主索引頁面 ==========
     latest = articles[0]
     past_articles = articles[1:]
     
@@ -1041,11 +1104,9 @@ def generate_daily_post_index(daily_post_dir):
     full_content_html = latest.get('content', '')
     
     # 右側熱門分類與連結
-    # 計算本站統計
     total_articles = len(articles)
     estimated_words = total_articles * 650
     
-    # 右側分類瀏覽 + 本站統計
     sidebar_html = f"""
                     <div class="sidebar-col">
                         <div class="sidebar-card">
@@ -1068,7 +1129,6 @@ def generate_daily_post_index(daily_post_dir):
                         </div>
                     </div>"""
     
-    # 過往文章列表
     past_list_html = ""
     for article in past_articles[:10]:
         past_list_html += f"""
@@ -1528,7 +1588,7 @@ def generate_daily_post_index(daily_post_dir):
             f.write(cat_page_html)
         print(f"📁 已產生分類頁面：{category_files[current_cat]} (含搜尋功能)")
 
-# ==================== 推送（保持不變） ====================
+# ==================== 推送 ====================
 def commit_and_push_to_website():
     """推送到網站倉庫"""
     print("=" * 50)
@@ -1593,15 +1653,14 @@ def commit_and_push_to_website():
 # ==================== 主程式 ====================
 def main():
     print("=" * 50)
-    print("🌿 蕨積每日發文機器人啟動")
+    print("🌿 蕨積每日發文機器人啟動 (70%原創觀點版)")
     print(f"執行時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     # ========== 防重複檢查 ==========
     if check_today_article_exists():
         print("❌ 今天已經有文章了，跳過本次發文（避免重複）")
         print("💡 如需強制發文，請手動刪除今天的文章後再執行")
-        return
-    # ================================
+        return    # ================================
     
     article = generate_article()
     if not article or not article.get("title"):
