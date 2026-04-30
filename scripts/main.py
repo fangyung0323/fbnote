@@ -1114,16 +1114,16 @@ def generate_daily_post_index(daily_post_dir):
                         </div>
                     </div>"""
     
-    # 過往文章列表
+   # 過往文章列表
    past_list_html = ""
    for article in past_articles[:10]:
-    past_list_html += f"""
+       past_list_html += f"""
                         <li class="past-item">
                             <span class="past-badge" style="display:none;">{article['category']}</span>
                             <a class="past-link" href="{article['filename']}">{article['title']}</a>
                             <div class="past-meta">📅 {article['date']} · {article['category']}</div>
                         </li>"""
-    
+     
     index_html = f"""<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
