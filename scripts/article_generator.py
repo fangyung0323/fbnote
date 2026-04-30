@@ -7,56 +7,31 @@ def generate_article():
     category = get_today_category()
     custom = get_custom_config()
 
-    # 決定角色
+    # 固定角色（蕨積風格）
     role_prompt = "你是「蕨積內容編輯」，習慣用生活觀察的方式描述空間、植物與人的關係。"
 
-    # ==================== 核心修改：優先從新聞讀取主題 ====================
+    # ==================== 主題來源 ====================
     news_context = None
     subtopic = None
     
-    # 檢查是否有手動指定主題（手動模式優先）
     if custom["topics"].get(category):
         subtopic = custom["topics"][category]
         print(f"🌱 手動主題：{subtopic}")
     else:
-        # 嘗試從爬蟲新聞讀取
         news_data = get_news_based_topic(category)
         
         if news_data:
-            # 有新聞資料，使用新聞主題
             subtopic = news_data["topic"]
             news_context = news_data["news_context"]
             print(f"📰 新聞主題：{subtopic}")
             print(f"📰 新聞來源：{news_data.get('source', '未知')} ({news_data.get('date', '日期不詳')})")
         else:
-            # 沒有新聞資料，回退到內建主題庫
             subtopic = random.choice(SUB_TOPICS.get(category, ["一般主題"]))
             print(f"🌱 隨機主題（內建）：{subtopic}")
 
-    # 決定寫作風格
-    if custom["style"]:
-        style = custom["style"]
-        print(f"✍️ 手動風格：{style}")
-    else:
-        print(f"✍️ 隨機風格：{style}")
-
-    # 決定文章結構
-    if custom["structure"]:
-        structure = custom["structure"]
-        print(f"📐 手動結構：{structure}")
-    else:
-        print(f"📐 隨機結構：{structure}")
-
-    # ==================== 建構 Prompt（加入新聞參考資料） ====================
-    
-    # 新聞參考區塊（如果有的話）
-    news_section = ""
+    # ==================== 新聞區塊 ====================
     if news_context:
         news_section = f"""
-【⚠️ 重要：以下是真實新聞資料，請務必參考】
-{news_context}
-
-news_section = f"""
 【參考新聞】
 {news_context}
 
@@ -69,9 +44,10 @@ news_section = f"""
     else:
         news_section = """
 【寫作參考】
-目前無特定新聞參考資料，請基於你的知識和以下主題撰寫。
+目前無特定新聞資料，請基於主題進行生活觀察書寫。
 """
 
+    # ==================== Prompt ====================
     prompt = f"""
 請根據以下主題，撰寫一篇「生活觀察型文章」。
 
@@ -99,9 +75,6 @@ news_section = f"""
 - 不要強調數據或專業術語
 - 不要出現「總之」「綜上所述」
 - 不要提到 AI、ChatGPT
-
-【新聞使用方式】
-{"- 將新聞內容自然融入情境中，而不是解釋新聞" if news_context else "- 可自由發揮生活觀察"}
 
 【Email 使用（很重要）】
 title：
@@ -156,52 +129,58 @@ JSON 結構如下：
     }
 
     print("🤖 正在呼叫 DeepSeek API 生成文章...")
+
     try:
         response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=90)
         response.raise_for_status()
         data = response.json()
-        
+
         article_data = json.loads(data["choices"][0]["message"]["content"])
-        
+
         title = article_data.get("title", "")
         summary = article_data.get("summary", "")
         key_points = article_data.get("key_points", [])
         content = article_data.get("content", "")
-        
+
+        # 清除 markdown 殘留
         content = re.sub(r'\*\*(.+?)\*\*', r'\1', content)
         content = re.sub(r'\*(.+?)\*', r'\1', content)
         content = re.sub(r'^#{1,6}\s+', '', content, flags=re.MULTILINE)
-        
+
+        # fallback title
         if not title:
             title = f"{category}｜{subtopic[:20]}"
-        
+
+        # key_points 修正
         if not isinstance(key_points, list):
             key_points = []
-        while len(key_points) < 3:
-            fallback_points = [
-    "有些變化很慢",
-    "空間會影響人",
-    "綠其實一直都在"
-]
 
-while len(key_points) < 3:
-    key_points.append(random.choice(fallback_points))
+        fallback_points = [
+            "有些變化很慢",
+            "空間會影響人",
+            "綠其實一直都在"
+        ]
+
+        while len(key_points) < 3:
+            key_points.append(random.choice(fallback_points))
+
         key_points = key_points[:3]
-        
+
+        # 字數計算
         content_text = re.sub(r'<[^>]+>', '', content)
         word_count = len(content_text)
-        
+
         print(f"✅ 文章生成成功：{title}")
         print(f"📂 類別：{category}")
         print(f"📏 文章長度：{word_count} 字")
-        
+
         if word_count < 400:
-            print(f"⚠️ 警告：文章太短（{word_count}字），建議檢查內容品質")
+            print(f"⚠️ 警告：文章太短（{word_count}字）")
         elif word_count < 600:
-            print(f"📌 提示：文章長度略低於目標（600-800），勉強接受")
+            print(f"📌 長度略低但可接受")
         else:
-            print(f"✨ 文章長度符合目標（600-800字）")
-        
+            print(f"✨ 長度正常")
+
         return {
             "title": title,
             "content": content,
@@ -209,15 +188,17 @@ while len(key_points) < 3:
             "summary": summary,
             "key_points": key_points
         }
-        
+
     except json.JSONDecodeError as e:
         print(f"❌ JSON 解析失敗：{e}")
         if 'data' in locals():
-            print(f"原始回應前 500 字：{data['choices'][0]['message']['content'][:500]}...")
+            print(data["choices"][0]["message"]["content"][:500])
         return None
+
     except requests.exceptions.Timeout:
-        print("❌ API 呼叫超時（90秒），請稍後重試")
+        print("❌ API 呼叫超時")
         return None
+
     except Exception as e:
         print(f"❌ API 呼叫失敗：{e}")
         return None
