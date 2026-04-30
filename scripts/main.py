@@ -1116,7 +1116,7 @@ def generate_daily_post_index(daily_post_dir):
     
     # 過往文章列表
    past_list_html = ""
-for article in past_articles[:10]:
+   for article in past_articles[:10]:
     past_list_html += f"""
                         <li class="past-item">
                             <span class="past-badge" style="display:none;">{article['category']}</span>
