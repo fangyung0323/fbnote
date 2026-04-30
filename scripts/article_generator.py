@@ -8,12 +8,7 @@ def generate_article():
     custom = get_custom_config()
 
     # 決定角色
-    if custom["role"]:
-        role_prompt = f"你是一位{custom['role']}，擅長撰寫有趣且專業的文章。"
-        print(f"🎭 手動角色：{custom['role']}")
-    else:
-        role_prompt = DEFAULT_ROLES.get(category, "你是一位科普作家。")
-        print(f"🎭 預設角色（{category}）")
+    role_prompt = "你是「蕨積內容編輯」，習慣用生活觀察的方式描述空間、植物與人的關係。"
 
     # ==================== 核心修改：優先從新聞讀取主題 ====================
     news_context = None
@@ -43,7 +38,6 @@ def generate_article():
         style = custom["style"]
         print(f"✍️ 手動風格：{style}")
     else:
-        style = random.choice(DEFAULT_STYLES)
         print(f"✍️ 隨機風格：{style}")
 
     # 決定文章結構
@@ -51,7 +45,6 @@ def generate_article():
         structure = custom["structure"]
         print(f"📐 手動結構：{structure}")
     else:
-        structure = random.choice(DEFAULT_STRUCTURES)
         print(f"📐 隨機結構：{structure}")
 
     # ==================== 建構 Prompt（加入新聞參考資料） ====================
@@ -63,11 +56,15 @@ def generate_article():
 【⚠️ 重要：以下是真實新聞資料，請務必參考】
 {news_context}
 
-【寫作要求】
-1. 請以這則新聞為文章的「核心靈感」或「切入點」
-2. 文章中必須引用新聞中的具體資訊（數據、案例、政策內容等）
-3. 可以在新聞基礎上進行延伸、補充背景知識或提出觀點
-4. 如果可能，在文章結尾註明參考來源
+news_section = f"""
+【參考新聞】
+{news_context}
+
+【使用方式（重要）】
+- 將新聞作為「背景靈感」
+- 可以輕微提及，但不要解釋新聞
+- 不要整理、分析或評論新聞
+- 重點仍然是生活觀察
 """
     else:
         news_section = """
@@ -75,41 +72,71 @@ def generate_article():
 目前無特定新聞參考資料，請基於你的知識和以下主題撰寫。
 """
 
-    prompt = f"""請寫一篇關於「{category}」的專業科普或生活文章。
+    prompt = f"""
+請根據以下主題，撰寫一篇「生活觀察型文章」。
+
+【主題】
+{subtopic}
 
 {news_section}
 
-今天的主題是：{subtopic}
+【寫作方式】
+- 從一個生活中的小場景或感受開始
+- 描述人與空間、環境、植物之間的關係
+- 不要急著解釋或教學
+- 讓讀者自己感覺到變化
 
-寫作風格：{style}
+【語氣】
+- 自然、安靜、有畫面感
+- 像是在記錄一個觀察
+- 不要有專家感
 
-文章結構：{structure}
+【嚴格限制】
+- 不要使用「首先、其次、最後」
+- 不要條列式內容
+- 不要寫成教學文
+- 不要出現「可以從以下幾點」
+- 不要強調數據或專業術語
+- 不要出現「總之」「綜上所述」
+- 不要提到 AI、ChatGPT
 
-【嚴格要求】
-1. 文章長度：**至少 600 字，最多 900 字**（請確實遵守）
-2. 內容必須包含：
-   - 具體的實例或案例（至少 1 個）
-   - 可操作的建議或步驟（至少 3 點）
-   - 數據或研究發現（可合理推估，但要具體）
-3. 結尾要有總結段落
+【新聞使用方式】
+{"- 將新聞內容自然融入情境中，而不是解釋新聞" if news_context else "- 可自由發揮生活觀察"}
 
-【輸出格式】請以 JSON 格式輸出，包含以下欄位：
-- title: 文章標題（12字以內，要吸引人）
-- summary: 一句話總結（25字以內）
-- key_points: 三個重點，格式為 ["重點一", "重點二", "重點三"]
-- content: 文章內文（使用 HTML 格式，包含 <h2>、<p> 標籤）
+【Email 使用（很重要）】
+title：
+- 12字內
+- 有畫面感（不要像新聞標題）
 
-【內容品質要求】
-- 不要空泛的廢話，每段都要有實質內容
-- 不要重複同樣的觀點
-- 使用繁體中文，語氣自然流暢
-- 結尾加上「🌿 蕨積 - 讓生活多一點綠」
+summary：
+- 20~30字
+- 像一句觀察
 
-【禁止事項】
-- 禁止使用 Markdown 語法（不要用 **bold**、# 標題）
-- 禁止輸出 JSON 以外的任何文字
-- 禁止寫「總之」、「綜上所述」這類敷衍結尾
-{"- 如有參考新聞，請在文章中適當位置體現新聞資訊" if news_context else ""}
+key_points：
+- 3句話
+- 每句不超過15字
+- 像感受，不是知識
+
+【輸出格式（非常重要）】
+請「只輸出 JSON」，不要包含任何說明文字。
+
+JSON 結構如下：
+{{
+  "title": "",
+  "summary": "",
+  "key_points": ["", "", ""],
+  "content": ""
+}}
+
+【HTML 規則】
+- content 使用 HTML（<p> 為主）
+- 不要使用 Markdown（例如 ** 或 #）
+
+【長度】
+400～700字
+
+結尾加上：
+🌿 蕨積 - 讓生活多一點綠
 """
 
     headers = {
@@ -151,7 +178,14 @@ def generate_article():
         if not isinstance(key_points, list):
             key_points = []
         while len(key_points) < 3:
-            key_points.append("更多精彩內容請看內文")
+            fallback_points = [
+    "有些變化很慢",
+    "空間會影響人",
+    "綠其實一直都在"
+]
+
+while len(key_points) < 3:
+    key_points.append(random.choice(fallback_points))
         key_points = key_points[:3]
         
         content_text = re.sub(r'<[^>]+>', '', content)
