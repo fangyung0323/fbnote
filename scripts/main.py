@@ -869,7 +869,7 @@ def save_article_as_html(title, content, category, summary, key_points, output_d
     <meta name="article-category" content="{category}">
     <meta name="article-date" content="{date_str}">
     <meta name="author" content="蕨積 FernBrom">
-    <title>{title} - 蕨積每日文章</title>
+    <title>{title} - AI每日文章</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -1051,7 +1051,7 @@ def generate_daily_post_index(daily_post_dir):
     <div id="nav-placeholder"></div>
     <main class="content">
         <div style="text-align:center;padding:60px 20px;">
-            <h1 style="font-family:'Noto Serif TC',serif;color:var(--moss);">🌿 蕨積每日文章</h1>
+            <h1 style="font-family:'Noto Serif TC',serif;color:var(--moss);">🌿 AI每日文章</h1>
             <p style="color:var(--stone);margin-top:1rem;">📭 目前還沒有文章，等待機器人發文中...</p>
         </div>
     </main>
@@ -1128,7 +1128,7 @@ def generate_daily_post_index(daily_post_dir):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>蕨積每日文章 - 植物・永續・碳盤查・生活</title>
+    <title>AI每日文章 - 植物・永續・碳盤查・生活</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Noto+Sans+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -1260,7 +1260,7 @@ def generate_daily_post_index(daily_post_dir):
     <main class="content">
         <div class="daily-container">
             <div class="page-header">
-                <h1>🌿 蕨積每日文章</h1>
+                <h1>🌿 AI每日文章</h1>
                 <p>植物・永續・碳盤查・生活 — 每天一篇，與你一起成長</p>
             </div>
             
@@ -1533,7 +1533,7 @@ def generate_daily_post_index(daily_post_dir):
         <div class="category-container">
             <div class="category-header">
                 <h1>{category_emojis[current_cat]} {current_cat}文章</h1>
-                <p>蕨積每日文章 - {current_cat}分類精選</p>
+                <p>AI每日文章 - {current_cat}分類精選</p>
             </div>
             
             <div class="search-box">
