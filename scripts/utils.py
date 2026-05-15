@@ -109,11 +109,25 @@ def mark_email_sent():
         result = os.system(cmd)
         
         if result == 0:
-            # 推送到遠端
-            push_cmd = f'git push origin {tag_name}'
-            os.system(push_cmd)
-            print(f"✅ 已標記今日 ({today_str}) 信件已寄送")
-            return True
+            # 取得 GH_TOKEN
+            token = os.getenv("GH_TOKEN")
+            if not token:
+                print("⚠️ GH_TOKEN 未設定，無法推送 tag")
+                return False
+            
+            # 建構正確的 remote URL（直接使用 token 和正確的倉庫）
+            correct_remote = f"https://isa930323-jpg:{token}@github.com/isa930323-jpg/fb.git"
+            
+            # 直接推送到正確的 remote，不依賴 origin 設定
+            push_cmd = f'git push {correct_remote} {tag_name}'
+            push_result = os.system(push_cmd)
+            
+            if push_result == 0:
+                print(f"✅ 已標記今日 ({today_str}) 信件已寄送")
+                return True
+            else:
+                print(f"⚠️ 無法推送 tag 到遠端：{tag_name}")
+                return False
         else:
             print(f"⚠️ 無法建立 tag：{tag_name}")
             return False
