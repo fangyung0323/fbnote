@@ -2,7 +2,7 @@
 """
 每日摘要寄送機器人
 - 從 Google Sheet 讀取訂閱者名單
-- 從文章 HTML 中讀取預存的摘要（直接從 GitHub Raw 讀取，不受部署延遲影響）
+- 從文章 HTML 中讀取預存的摘要（直接從網站讀取，不受 GitHub Raw 延遲影響）
 - 透過 Gmail SMTP 寄送
 """
 
@@ -12,7 +12,6 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
-from urllib.parse import quote  # ✅ 新增：處理中文檔名 URL 編碼
 import requests
 from bs4 import BeautifulSoup
 import gspread
@@ -60,20 +59,12 @@ def get_subscribers():
 
 # ==================== 從文章讀取摘要和重點 ====================
 def get_article_summary(article_url):
-    """從文章 HTML 中讀取預存的摘要和重點（自動轉換為 GitHub Raw）"""
+    """直接從網站讀取文章的摘要和重點（不經過 GitHub Raw）"""
     try:
-        # 將網站網址轉換為 GitHub Raw 網址（避免等待 Render 部署）
-        if "fernbrom.com" in article_url:
-            filename = article_url.split('/')[-1]
-            # ✅ 關鍵修改：對檔名進行 URL 編碼，支援中文和特殊字元
-            encoded_filename = quote(filename, safe='')
-            raw_url = f"https://raw.githubusercontent.com/isa930323-jpg/fb/main/daily-post/{encoded_filename}"
-            print(f"📡 從 GitHub Raw 讀取: {raw_url}")
-            response = requests.get(raw_url)
-        else:
-            response = requests.get(article_url)
-        
+        print(f"📡 從網站讀取: {article_url}")
+        response = requests.get(article_url)
         response.raise_for_status()
+        
         soup = BeautifulSoup(response.text, 'html.parser')
         
         # 讀取標題
@@ -109,7 +100,7 @@ def get_today_article():
         print("❌ 找不到今日文章")
         return None, None, None, None
     
-    # 建構文章 URL
+    # 建構文章 URL（直接使用網站網址）
     article_url = f"https://www.fernbrom.com/daily-post/{article_filename}"
     
     print(f"📰 找到今日文章: {article_filename}")
@@ -225,12 +216,12 @@ def main():
     
     # 2. 抓取當日文章（使用統一邏輯）
     title, summary, key_points_html, article_url = get_today_article()
-    if not title:
+    if not title or title == "無標題":
         print("❌ 無法取得文章，結束程式")
         return
     
     print(f"📝 今日文章：{title}")
-    print(f"📋 摘要：{summary}")
+    print(f"📋 摘要：{summary[:100]}..." if len(summary) > 100 else f"📋 摘要：{summary}")
     
     # 3. 寄送給所有訂閱者
     success_count = 0
