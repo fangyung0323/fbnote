@@ -12,6 +12,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
+from urllib.parse import quote  # ✅ 新增：處理中文檔名 URL 編碼
 import requests
 from bs4 import BeautifulSoup
 import gspread
@@ -64,7 +65,9 @@ def get_article_summary(article_url):
         # 將網站網址轉換為 GitHub Raw 網址（避免等待 Render 部署）
         if "fernbrom.com" in article_url:
             filename = article_url.split('/')[-1]
-            raw_url = f"https://raw.githubusercontent.com/isa930323-jpg/fb/main/daily-post/{filename}"
+            # ✅ 關鍵修改：對檔名進行 URL 編碼，支援中文和特殊字元
+            encoded_filename = quote(filename, safe='')
+            raw_url = f"https://raw.githubusercontent.com/isa930323-jpg/fb/main/daily-post/{encoded_filename}"
             print(f"📡 從 GitHub Raw 讀取: {raw_url}")
             response = requests.get(raw_url)
         else:
@@ -208,12 +211,7 @@ def main():
     print("=" * 50)
     # ========== 除錯結束 ==========
     
-    # 暫時註解防重複檢查
-    # if not check_today_article_exists():
-    #     print("❌ 今天還沒有新文章，跳過寄信")
-    #     print("💡 請先執行發文機器人")
-    #     return
-    
+    # 檢查今天是否已經寄過信
     if check_today_email_sent():
         print("❌ 今天已經寄過摘要信了，跳過本次寄送")
         print("💡 如需重新寄送，請手動刪除對應的 Git Tag")
